@@ -59,9 +59,8 @@ const ADXConfigurationPage: FC = observer(() => {
                     <IotCentralPanel
                         userDisplayName={sessionStore.displayName}
                         confgurationName={mainStore.configuration.name}
-                        configurationDateCreated={mainStore.configuration.created}
                         configItems={mainStore.configuration.configItems}
-                        deploying={mainStore.deploying}
+                        deployingItemId={mainStore.deployingItemId}
                         progressTotal={mainStore.provisionProgress.total}
                         progressValue={mainStore.provisionProgress.value}
                         progressLabel={mainStore.provisionProgress.label}

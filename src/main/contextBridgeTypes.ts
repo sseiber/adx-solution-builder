@@ -20,6 +20,7 @@ const Ipc_Log = 'Ipc_Log';
 const Ipc_OpenConfiguration = 'Ipc_OpenConfiguration';
 const Ipc_StartProvisioning = 'Ipc_StartProvisioning';
 const Ipc_ProvisionProgress = 'Ipc_ProvisionProgress';
+const Ipc_StartProvisioningItem = 'Ipc_StartProvisioningItem';
 const Ipc_EndProvisioning = 'Ipc_EndProvisioning';
 const Ipc_GetAdapterConfiguration = 'Ipc_GetAdapterConfiguration';
 const Ipc_SetAdapterConfiguration = 'Ipc_SetAdapterConfiguration';
@@ -69,6 +70,7 @@ declare global {
             [Ipc_OpenConfiguration]: (loadLastConfiguration: boolean) => Promise<IIpcResult>;
             [Ipc_StartProvisioning]: () => Promise<IIpcResult>;
             [Ipc_ProvisionProgress]: (channel: string, receiver: (event: IpcRendererEvent, message: IIpcProgress) => void) => void;
+            [Ipc_StartProvisioningItem]: (channel: string, receiver: (event: IpcRendererEvent, itemId: string) => void) => void;
             [Ipc_EndProvisioning]: (channel: string, receiver: (event: IpcRendererEvent) => void) => void;
             [Ipc_GetAdapterConfiguration]: (appId: string, deviceId: string) => Promise<IAdapterConfiguration>;
             [Ipc_SetAdapterConfiguration]: (adapterConfig: IAdapterConfiguration) => Promise<boolean>;
@@ -106,6 +108,7 @@ export {
     Ipc_OpenConfiguration,
     Ipc_StartProvisioning,
     Ipc_ProvisionProgress,
+    Ipc_StartProvisioningItem,
     Ipc_EndProvisioning,
     Ipc_GetAdapterConfiguration,
     Ipc_SetAdapterConfiguration,

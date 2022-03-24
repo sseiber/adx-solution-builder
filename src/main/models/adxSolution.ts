@@ -8,19 +8,24 @@ export enum AdxResourceType {
     VirtualMachine = 'VirtualMachine'
 }
 
+export interface IProvisionResult {
+    resourceId: string;
+    provisionResponse: any;
+}
+
 export interface IAdxConfigurationItem {
     id: string;
     name: string;
     resourceName: string;
     resourceType: string;
-    payload?: any;
+    payload: any;
+    provisoinResult?: IProvisionResult;
 }
 
 export interface IAdxSolution {
     fileType: string;
     name: string;
     id: string;
-    created: string;
     configItems: IAdxConfigurationItem[];
 }
 
@@ -28,6 +33,5 @@ export const emptySolution: IAdxSolution = {
     fileType: AdxConfigurationFileType,
     name: '',
     id: '',
-    created: '',
     configItems: []
 };

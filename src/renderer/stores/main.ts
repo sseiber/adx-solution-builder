@@ -30,13 +30,14 @@ export class MainStore {
         this.solutionImageFromResourceType.set(AdxResourceType.VirtualMachine, 'vm.png');
 
         window.ipcApi[contextBridgeTypes.Ipc_ProvisionProgress](contextBridgeTypes.Ipc_ProvisionProgress, this.onProvisionProgress.bind(this));
+        window.ipcApi[contextBridgeTypes.Ipc_StartProvisioningItem](contextBridgeTypes.Ipc_StartProvisioningItem, this.onStartProvisioningItem.bind(this));
         window.ipcApi[contextBridgeTypes.Ipc_EndProvisioning](contextBridgeTypes.Ipc_EndProvisioning, this.onEndProvisioning.bind(this));
     }
 
     public configuration: IAdxSolution = emptySolution;
     public serviceError = '';
     public solutionImageFromResourceType: Map<string, string>;
-    public deploying = false;
+    public deployingItemId = '';
     public provisionProgress: IIpcProgress = {
         label: '',
         value: 0,
@@ -62,16 +63,18 @@ export class MainStore {
     }
 
     public async startProvisioning(): Promise<IIpcResult> {
-        runInAction(() => {
-            this.deploying = true;
-        });
-
         const response = await window.ipcApi[contextBridgeTypes.Ipc_StartProvisioning]();
 
         return response || {
             result: false,
             message: 'An unknown error occurred during the provisioning process.'
         };
+    }
+
+    private onStartProvisioningItem(_event: IpcRendererEvent, itemId: string): void {
+        runInAction(() => {
+            this.deployingItemId = itemId;
+        });
     }
 
     private onProvisionProgress(_event: IpcRendererEvent, message: IIpcProgress): void {
@@ -82,7 +85,7 @@ export class MainStore {
 
     private onEndProvisioning(_event: IpcRendererEvent): void {
         runInAction(() => {
-            this.deploying = false;
+            this.deployingItemId = '';
         });
     }
 }

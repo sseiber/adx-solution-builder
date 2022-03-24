@@ -8,9 +8,8 @@ import ADXConfigurationItem from './ADXConfigurationItem';
 interface IADXConfigurationPanelProps {
     userDisplayName: string;
     confgurationName: string;
-    configurationDateCreated: string;
     configItems: IAdxConfigurationItem[];
-    deploying: boolean;
+    deployingItemId: string;
     progressTotal: number;
     progressValue: number;
     progressLabel: string;
@@ -19,13 +18,13 @@ interface IADXConfigurationPanelProps {
 const ADXConfigurationPanel: FC<IADXConfigurationPanelProps> = observer((props: IADXConfigurationPanelProps) => {
     const {
         confgurationName,
-        configurationDateCreated,
         configItems,
-        deploying,
+        deployingItemId,
         progressTotal,
         progressValue,
         progressLabel
     } = props;
+
     const {
         mainStore
     } = useStore();
@@ -37,7 +36,7 @@ const ADXConfigurationPanel: FC<IADXConfigurationPanelProps> = observer((props: 
                     <Header attached="top" as="h3" color='blue'>
                         {
                             (configItems?.length || 0) > 0
-                                ? `${confgurationName}, ${configurationDateCreated}`
+                                ? `${confgurationName}`
                                 : 'No Configuration'
                         }
                     </Header>
@@ -51,10 +50,13 @@ const ADXConfigurationPanel: FC<IADXConfigurationPanelProps> = observer((props: 
                                                 return (
                                                     <ADXConfigurationItem
                                                         key={item.id}
+                                                        id={item.id}
                                                         name={item.name}
                                                         resourceName={item.resourceName}
                                                         resourceImageSrc={mainStore.solutionImageFromResourceType.get(item.resourceType)}
-                                                        deploying={deploying}
+                                                        resourceId={item?.provisoinResult?.resourceId || ''}
+                                                        deployingItemId={deployingItemId}
+                                                        provisioned={!!item?.provisoinResult?.resourceId}
                                                         progressTotal={progressTotal}
                                                         progressValue={progressValue}
                                                         progressLabel={progressLabel}

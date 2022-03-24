@@ -3,27 +3,30 @@ import { Label, Image, Message, Item, Progress, Grid } from 'semantic-ui-react';
 
 interface IADXConfigurationItemProps {
     key: string;
+    id: string;
     name: string;
     resourceName: string;
+    resourceId: string;
     resourceImageSrc: string;
-    deploying: boolean;
+    deployingItemId: string;
+    provisioned: boolean;
     progressTotal: number;
     progressValue: number;
     progressLabel: string;
 }
 const ADXConfigurationItem: FC<IADXConfigurationItemProps> = (props: IADXConfigurationItemProps) => {
     const {
+        id,
         name,
         resourceName,
+        resourceId,
         resourceImageSrc,
-        deploying,
+        deployingItemId,
+        provisioned,
         progressTotal,
         progressValue,
         progressLabel
     } = props;
-
-    const provisioned = false;
-    const resourceId = '';
 
     return (
         <Message>
@@ -39,12 +42,12 @@ const ADXConfigurationItem: FC<IADXConfigurationItemProps> = (props: IADXConfigu
                                 />
                                 <Item.Header>{name}</Item.Header>
                                 <Item.Meta>
-                                    <span>{provisioned ? resourceId : ''}</span>
+                                    <span>{resourceId}</span>
                                 </Item.Meta>
                             </Grid.Column>
                             <Grid.Column width={6}>
                                 {
-                                    deploying
+                                    deployingItemId === id
                                         ? (
                                             <>
                                                 <Progress
@@ -53,10 +56,8 @@ const ADXConfigurationItem: FC<IADXConfigurationItemProps> = (props: IADXConfigu
                                                     total={progressTotal}
                                                     value={progressValue}
                                                     active
-                                                // content={progressLabel}
+                                                    content={progressLabel}
                                                 />
-                                                value={progressValue}
-                                                label={progressLabel}
                                             </>
                                         )
                                         : null

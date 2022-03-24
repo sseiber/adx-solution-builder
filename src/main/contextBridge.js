@@ -15,6 +15,9 @@ contextBridge.exposeInMainWorld('ipcApi', {
     [contextBridgeTypes.Ipc_ProvisionProgress]: (channel, receiver) => {
         ipcRenderer.on(channel, (event, message) => receiver(event, message));
     },
+    [contextBridgeTypes.Ipc_StartProvisioningItem]: (channel, receiver) => {
+        ipcRenderer.on(channel, (event, itemId) => receiver(event, itemId));
+    },
     [contextBridgeTypes.Ipc_EndProvisioning]: (channel, receiver) => {
         ipcRenderer.on(channel, (event) => receiver(event));
     },

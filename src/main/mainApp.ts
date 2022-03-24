@@ -196,65 +196,24 @@ export class MainApp {
     }
 
     private async doProvisioning(): Promise<void> {
-        this.mainWindow.webContents.send(contextBridgeTypes.Ipc_ProvisionProgress, {
-            label: 'Provisioning <app>',
-            value: 3,
-            total: 10
-        });
+        this.mainWindow.webContents.send(contextBridgeTypes.Ipc_StartProvisioningItem, 'c71b8a4c-2cc6-4f88-b986-4a1293989c95');
 
-        await new Promise((resolve) => {
-            setTimeout(() => {
-                return resolve('');
-            }, 1000 * 2);
-        });
+        let value = 1;
+        while (value < 10) {
+            this.mainWindow.webContents.send(contextBridgeTypes.Ipc_ProvisionProgress, {
+                label: 'Provisioning...',
+                value,
+                total: 10
+            });
 
-        this.mainWindow.webContents.send(contextBridgeTypes.Ipc_ProvisionProgress, {
-            label: 'Provisioning <app>',
-            value: 4,
-            total: 10
-        });
+            await new Promise((resolve) => {
+                setTimeout(() => {
+                    return resolve('');
+                }, 1000 * 2);
+            });
 
-        await new Promise((resolve) => {
-            setTimeout(() => {
-                return resolve('');
-            }, 1000 * 2);
-        });
-
-        this.mainWindow.webContents.send(contextBridgeTypes.Ipc_ProvisionProgress, {
-            label: 'Provisioning <app>',
-            value: 7,
-            total: 10
-        });
-
-        await new Promise((resolve) => {
-            setTimeout(() => {
-                return resolve('');
-            }, 1000 * 2);
-        });
-
-        this.mainWindow.webContents.send(contextBridgeTypes.Ipc_ProvisionProgress, {
-            label: 'Provisioning <app>',
-            value: 9,
-            total: 10
-        });
-
-        await new Promise((resolve) => {
-            setTimeout(() => {
-                return resolve('');
-            }, 1000 * 1);
-        });
-
-        this.mainWindow.webContents.send(contextBridgeTypes.Ipc_ProvisionProgress, {
-            label: 'Provisioning <app>',
-            value: 10,
-            total: 10
-        });
-
-        await new Promise((resolve) => {
-            setTimeout(() => {
-                return resolve('');
-            }, 1000 * 1);
-        });
+            value += 3;
+        }
 
         this.mainWindow.webContents.send(contextBridgeTypes.Ipc_EndProvisioning);
     }
