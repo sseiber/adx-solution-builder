@@ -5,21 +5,18 @@ export enum AdxResourceType {
     IoTCentralAppFeature = 'IoTCentralAppFeature',
     AzureDataExplorerCluster = 'AzureDataExplorerCluster',
     AzureDataExplorerFeature = 'AzureDataExplorerFeature',
-    VirtualMachine = 'VirtualMachine'
-}
-
-export interface IProvisionResult {
-    resourceId: string;
-    provisionResponse: any;
+    VirtualMachine = 'VirtualMachine',
+    ResourceGroup = 'ResourceGroup'
 }
 
 export interface IAdxConfigurationItem {
     id: string;
     name: string;
+    itemType: string;
+    resourceApiType: string;
     resourceName: string;
-    resourceType: string;
     payload: any;
-    provisoinResult?: IProvisionResult;
+    provisionResponse?: any;
 }
 
 export interface IAdxSolution {

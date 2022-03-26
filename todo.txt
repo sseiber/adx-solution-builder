@@ -1,0 +1,6 @@
+* prevent doProvision from executing if one is already
+* use a prefix-name for all resource names
+   - ask for via dialog
+   - specify in config
+* when you open the app - re-verify the resources if they are marked as provisioned
+* add links to the provisioned resource to navigate to the site in an external browser

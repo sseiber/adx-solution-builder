@@ -1,7 +1,17 @@
 /* eslint-disable max-len */
 import { IpcRendererEvent } from 'electron';
 import { AccountInfo } from '@azure/msal-node';
-import { IMsalConfig } from '../main/models/msalAuth';
+import {
+    IIpcResult,
+    IIpcProgress,
+    IErrorResult
+} from './models/main';
+import {
+    IMsalConfig
+} from '../main/models/msalAuth';
+import {
+    IAdxSolution
+} from '../main/models/adxSolution';
 import {
     IIotCentralApp,
     IIotCentralDevice,
@@ -18,13 +28,16 @@ import {
 // Main
 const Ipc_Log = 'Ipc_Log';
 const Ipc_OpenConfiguration = 'Ipc_OpenConfiguration';
+const Ipc_SaveConfiguration = 'Ipc_SaveConfiguration';
 const Ipc_StartProvisioning = 'Ipc_StartProvisioning';
 const Ipc_ProvisionProgress = 'Ipc_ProvisionProgress';
 const Ipc_StartProvisioningItem = 'Ipc_StartProvisioningItem';
+const Ipc_SaveProvisioningResponse = 'Ipc_SaveProvisioningResponse';
 const Ipc_EndProvisioning = 'Ipc_EndProvisioning';
 const Ipc_GetAdapterConfiguration = 'Ipc_GetAdapterConfiguration';
 const Ipc_SetAdapterConfiguration = 'Ipc_SetAdapterConfiguration';
 const Ipc_OpenLink = 'Ipc_OpenLink';
+const Ipc_ServiceError = 'Ipc_ServiceError';
 
 // Auth
 const Ipc_GetLastOAuthError = 'Ipc_GetLastOAuthError';
@@ -50,31 +63,22 @@ const Ipc_FetchNodesProgress = 'Ipc_FetchNodesProgress';
 
 const Ipc_ReceiveMessage = 'Ipc_ReceiveMessage';
 
-interface IIpcResult {
-    result: boolean;
-    message: string;
-    payload?: any;
-}
-
-interface IIpcProgress {
-    label: string;
-    value: number;
-    total: number;
-}
-
 declare global {
     interface Window {
         ipcApi: {
             // Main
             [Ipc_Log]: (tags: string[], message: string) => Promise<void>;
             [Ipc_OpenConfiguration]: (loadLastConfiguration: boolean) => Promise<IIpcResult>;
-            [Ipc_StartProvisioning]: () => Promise<IIpcResult>;
+            [Ipc_SaveConfiguration]: (adxSolution: IAdxSolution) => Promise<IIpcResult>;
+            [Ipc_StartProvisioning]: (adxSolution: IAdxSolution) => Promise<IIpcResult>;
             [Ipc_ProvisionProgress]: (channel: string, receiver: (event: IpcRendererEvent, message: IIpcProgress) => void) => void;
             [Ipc_StartProvisioningItem]: (channel: string, receiver: (event: IpcRendererEvent, itemId: string) => void) => void;
+            [Ipc_SaveProvisioningResponse]: (channel: string, receiver: (event: IpcRendererEvent, itemId: string, response: any) => void) => void;
             [Ipc_EndProvisioning]: (channel: string, receiver: (event: IpcRendererEvent) => void) => void;
             [Ipc_GetAdapterConfiguration]: (appId: string, deviceId: string) => Promise<IAdapterConfiguration>;
             [Ipc_SetAdapterConfiguration]: (adapterConfig: IAdapterConfiguration) => Promise<boolean>;
             [Ipc_OpenLink]: (url: string) => Promise<void>;
+            [Ipc_ServiceError]: (channel: string, receiver: (event: IpcRendererEvent, errorResult: IErrorResult) => void) => void;
 
             // Auth
             [Ipc_GetLastOAuthError]: () => Promise<string>;
@@ -106,13 +110,16 @@ declare global {
 export {
     Ipc_Log,
     Ipc_OpenConfiguration,
+    Ipc_SaveConfiguration,
     Ipc_StartProvisioning,
     Ipc_ProvisionProgress,
     Ipc_StartProvisioningItem,
+    Ipc_SaveProvisioningResponse,
     Ipc_EndProvisioning,
     Ipc_GetAdapterConfiguration,
     Ipc_SetAdapterConfiguration,
     Ipc_OpenLink,
+    Ipc_ServiceError,
     Ipc_GetLastOAuthError,
     Ipc_SetLastOAuthError,
     Ipc_SetMsalConfig,
@@ -129,7 +136,5 @@ export {
     Ipc_TestConnectionProgress,
     Ipc_FetchNodes,
     Ipc_FetchNodesProgress,
-    Ipc_ReceiveMessage,
-    IIpcResult,
-    IIpcProgress
+    Ipc_ReceiveMessage
 };

@@ -11,6 +11,7 @@ import HomePage from './pages/HomePage';
 import AzureConfigPage from './pages/AzureConfigPage';
 import ADXConfigurationPage from './pages/ADXConfiguration/ADXConfigurationPage';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import ServiceErrorModal from './components/ServiceErrorModal';
 import { log } from './utils';
 
 const ModuleName = 'App';
@@ -26,6 +27,7 @@ const App: FC = observer((props: any) => {
     const navigate = useNavigate();
     const location = useLocation();
     const {
+        mainStore,
         sessionStore
     } = useStore();
 
@@ -68,6 +70,10 @@ const App: FC = observer((props: any) => {
 
     const onClickSignout = async () => {
         await sessionStore.signout();
+    };
+
+    const onCloseErrorModal = () => {
+        mainStore.clearServiceError();
     };
 
     const logoMenuTitle = sessionStore.authenticationState === AuthenticationState.Authenticated ? `Home` : `Azure IoT Central`;
@@ -148,6 +154,10 @@ const App: FC = observer((props: any) => {
                     </Grid.Column>
                 </Grid>
                 <Menu fixed="bottom" inverted color="grey" style={{ padding: '1em 5em' }} />
+                <ServiceErrorModal
+                    errorResult={mainStore.serviceError}
+                    onClose={onCloseErrorModal}
+                />
             </InfoDialogServiceProvider>
         </ErrorBoundary>
     );

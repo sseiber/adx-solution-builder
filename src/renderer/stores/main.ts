@@ -1,10 +1,12 @@
 import { IpcRendererEvent } from 'electron';
-import { makeAutoObservable, runInAction } from 'mobx';
+import { makeAutoObservable, runInAction, toJS } from 'mobx';
 import * as contextBridgeTypes from '../../main/contextBridgeTypes';
 import {
     IIpcResult,
-    IIpcProgress
-} from '../../main/contextBridgeTypes';
+    IIpcProgress,
+    IErrorResult,
+    emptyErrorResult
+} from '../../main/models/main';
 import {
     AdxResourceType,
     IAdxSolution,
@@ -22,21 +24,24 @@ export class MainStore {
     constructor() {
         makeAutoObservable(this);
 
-        this.solutionImageFromResourceType = new Map<string, string>();
-        this.solutionImageFromResourceType.set(AdxResourceType.IoTCentralApp, 'iotcentral.png');
-        this.solutionImageFromResourceType.set(AdxResourceType.IoTCentralAppFeature, 'iotcentral.png');
-        this.solutionImageFromResourceType.set(AdxResourceType.AzureDataExplorerCluster, 'adx.png');
-        this.solutionImageFromResourceType.set(AdxResourceType.AzureDataExplorerFeature, 'adx.png');
-        this.solutionImageFromResourceType.set(AdxResourceType.VirtualMachine, 'vm.png');
+        this.mapItemImageFromType = new Map<string, string>();
+        this.mapItemImageFromType.set(AdxResourceType.IoTCentralApp, 'iotcentral.png');
+        this.mapItemImageFromType.set(AdxResourceType.IoTCentralAppFeature, 'iotcentral.png');
+        this.mapItemImageFromType.set(AdxResourceType.AzureDataExplorerCluster, 'adx.png');
+        this.mapItemImageFromType.set(AdxResourceType.AzureDataExplorerFeature, 'adx.png');
+        this.mapItemImageFromType.set(AdxResourceType.VirtualMachine, 'vm.png');
+        this.mapItemImageFromType.set(AdxResourceType.ResourceGroup, 'resourcegroup.png');
 
         window.ipcApi[contextBridgeTypes.Ipc_ProvisionProgress](contextBridgeTypes.Ipc_ProvisionProgress, this.onProvisionProgress.bind(this));
         window.ipcApi[contextBridgeTypes.Ipc_StartProvisioningItem](contextBridgeTypes.Ipc_StartProvisioningItem, this.onStartProvisioningItem.bind(this));
+        window.ipcApi[contextBridgeTypes.Ipc_SaveProvisioningResponse](contextBridgeTypes.Ipc_SaveProvisioningResponse, this.onSaveProvisioningResponse.bind(this));
         window.ipcApi[contextBridgeTypes.Ipc_EndProvisioning](contextBridgeTypes.Ipc_EndProvisioning, this.onEndProvisioning.bind(this));
+        window.ipcApi[contextBridgeTypes.Ipc_ServiceError](contextBridgeTypes.Ipc_ServiceError, this.onServiceError.bind(this));
     }
 
-    public configuration: IAdxSolution = emptySolution;
-    public serviceError = '';
-    public solutionImageFromResourceType: Map<string, string>;
+    public adxSolution: IAdxSolution = emptySolution;
+    public serviceError = emptyErrorResult;
+    public mapItemImageFromType: Map<string, string>;
     public deployingItemId = '';
     public provisionProgress: IIpcProgress = {
         label: '',
@@ -48,11 +53,23 @@ export class MainStore {
         return process.env.NODE_ENV === 'production';
     }
 
+    public clearServiceError(): void {
+        runInAction(() => {
+            this.serviceError = emptyErrorResult;
+        });
+    }
+
+    public setServiceError(errorResult: IErrorResult): void {
+        runInAction(() => {
+            this.serviceError = errorResult;
+        });
+    }
+
     public async openSolution(loadLastConfiguration: boolean): Promise<IIpcResult> {
         const response = await window.ipcApi[contextBridgeTypes.Ipc_OpenConfiguration](loadLastConfiguration);
         if (response && response.result && response.payload) {
             runInAction(() => {
-                this.configuration = response.payload;
+                this.adxSolution = response.payload;
             });
         }
 
@@ -63,7 +80,7 @@ export class MainStore {
     }
 
     public async startProvisioning(): Promise<IIpcResult> {
-        const response = await window.ipcApi[contextBridgeTypes.Ipc_StartProvisioning]();
+        const response = await window.ipcApi[contextBridgeTypes.Ipc_StartProvisioning](toJS(this.adxSolution));
 
         return response || {
             result: false,
@@ -77,6 +94,17 @@ export class MainStore {
         });
     }
 
+    private onSaveProvisioningResponse(_event: IpcRendererEvent, itemId: string, response: any): void {
+        runInAction(() => {
+            const configItem = this.adxSolution.configItems.find(item => item.id === itemId);
+            if (configItem) {
+                configItem.provisionResponse = response;
+            }
+        });
+
+        void window.ipcApi[contextBridgeTypes.Ipc_SaveConfiguration](toJS(this.adxSolution));
+    }
+
     private onProvisionProgress(_event: IpcRendererEvent, message: IIpcProgress): void {
         runInAction(() => {
             this.provisionProgress = message;
@@ -86,6 +114,12 @@ export class MainStore {
     private onEndProvisioning(_event: IpcRendererEvent): void {
         runInAction(() => {
             this.deployingItemId = '';
+        });
+    }
+
+    private onServiceError(_event: IpcRendererEvent, errorResult: IErrorResult): void {
+        runInAction(() => {
+            this.serviceError = errorResult;
         });
     }
 }

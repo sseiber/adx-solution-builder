@@ -1,7 +1,7 @@
 import { IpcRendererEvent } from 'electron';
 import { makeAutoObservable, runInAction } from 'mobx';
 import * as contextBridgeTypes from '../../main/contextBridgeTypes';
-import { IIpcProgress } from '../../main/contextBridgeTypes';
+import { IIpcProgress } from '../../main/models/main';
 import {
     IApiContext,
     IEndpoint,

@@ -1,7 +1,7 @@
 import React, { FC } from 'react';
 import { observer } from 'mobx-react-lite';
 import { useAsyncEffect } from 'use-async-effect';
-import { Button, Grid, Message } from 'semantic-ui-react';
+import { Button, Grid } from 'semantic-ui-react';
 import { useStore } from '../../stores/store';
 import { useInfoDialog, showInfoDialog } from '../../components/InfoDialogContext';
 import IotCentralPanel from './ADXConfigurationPanel';
@@ -50,30 +50,29 @@ const ADXConfigurationPage: FC = observer(() => {
     };
 
     return (
-        <Grid style={{ padding: '5em 5em' }}>
-            <Grid.Row>
-                <Grid.Column>
-                    <Message size='large'>
-                        <Message.Header>ADX Solution Builder</Message.Header>
-                    </Message>
-                    <IotCentralPanel
-                        userDisplayName={sessionStore.displayName}
-                        confgurationName={mainStore.configuration.name}
-                        configItems={mainStore.configuration.configItems}
-                        deployingItemId={mainStore.deployingItemId}
-                        progressTotal={mainStore.provisionProgress.total}
-                        progressValue={mainStore.provisionProgress.value}
-                        progressLabel={mainStore.provisionProgress.label}
-                    />
-                </Grid.Column>
-            </Grid.Row>
-            <Grid.Row>
-                <Grid.Column>
-                    <Button size='tiny' color='green' floated='right' onClick={onOpenSolution}>Open configuration</Button>
-                    <Button size='tiny' color='green' floated='left' onClick={onStartProvisioning}>Start Provisioning</Button>
-                </Grid.Column>
-            </Grid.Row>
-        </Grid>
+        <>
+            <Grid style={{ padding: '5em 5em' }}>
+                <Grid.Row>
+                    <Grid.Column>
+                        <IotCentralPanel
+                            userDisplayName={sessionStore.displayName}
+                            confgurationName={mainStore.adxSolution.name}
+                            configItems={mainStore.adxSolution.configItems}
+                            deployingItemId={mainStore.deployingItemId}
+                            progressTotal={mainStore.provisionProgress.total}
+                            progressValue={mainStore.provisionProgress.value}
+                            progressLabel={mainStore.provisionProgress.label}
+                        />
+                    </Grid.Column>
+                </Grid.Row>
+                <Grid.Row>
+                    <Grid.Column>
+                        <Button size='tiny' color='green' floated='right' onClick={onOpenSolution}>Open solution</Button>
+                        <Button size='tiny' color='green' floated='left' onClick={onStartProvisioning}>Start Provisioning</Button>
+                    </Grid.Column>
+                </Grid.Row>
+            </Grid>
+        </>
     );
 });
 

@@ -31,6 +31,7 @@ export const InfoDialog: FC<IInfoDialogProps> = ((props: IInfoDialogProps) => {
             size="small"
             open={visible}
             onClose={closeCallback}
+            closeOnEscape={false}
             closeOnDimmerClick={false}
         >
             <Modal.Header>{title}</Modal.Header>

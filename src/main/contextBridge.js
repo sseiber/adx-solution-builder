@@ -11,12 +11,16 @@ contextBridge.exposeInMainWorld('ipcApi', {
     // Main
     [contextBridgeTypes.Ipc_Log]: (tags, message) => ipcRenderer.invoke(contextBridgeTypes.Ipc_Log, tags, message),
     [contextBridgeTypes.Ipc_OpenConfiguration]: (loadLastConfiguration) => ipcRenderer.invoke(contextBridgeTypes.Ipc_OpenConfiguration, loadLastConfiguration),
-    [contextBridgeTypes.Ipc_StartProvisioning]: () => ipcRenderer.invoke(contextBridgeTypes.Ipc_StartProvisioning),
+    [contextBridgeTypes.Ipc_SaveConfiguration]: (adxSolution) => ipcRenderer.invoke(contextBridgeTypes.Ipc_SaveConfiguration, adxSolution),
+    [contextBridgeTypes.Ipc_StartProvisioning]: (adxSolution) => ipcRenderer.invoke(contextBridgeTypes.Ipc_StartProvisioning, adxSolution),
     [contextBridgeTypes.Ipc_ProvisionProgress]: (channel, receiver) => {
         ipcRenderer.on(channel, (event, message) => receiver(event, message));
     },
     [contextBridgeTypes.Ipc_StartProvisioningItem]: (channel, receiver) => {
         ipcRenderer.on(channel, (event, itemId) => receiver(event, itemId));
+    },
+    [contextBridgeTypes.Ipc_SaveProvisioningResponse]: (channel, receiver) => {
+        ipcRenderer.on(channel, (event, itemId, response) => receiver(event, itemId, response));
     },
     [contextBridgeTypes.Ipc_EndProvisioning]: (channel, receiver) => {
         ipcRenderer.on(channel, (event) => receiver(event));
@@ -24,6 +28,9 @@ contextBridge.exposeInMainWorld('ipcApi', {
     [contextBridgeTypes.Ipc_GetAdapterConfiguration]: (appId, deviceId) => ipcRenderer.invoke(contextBridgeTypes.Ipc_GetAdapterConfiguration, appId, deviceId),
     [contextBridgeTypes.Ipc_SetAdapterConfiguration]: (adapterConfig) => ipcRenderer.invoke(contextBridgeTypes.Ipc_SetAdapterConfiguration, adapterConfig),
     [contextBridgeTypes.Ipc_OpenLink]: (url) => ipcRenderer.invoke(contextBridgeTypes.Ipc_OpenLink, url),
+    [contextBridgeTypes.Ipc_ServiceError]: (channel, receiver) => {
+        ipcRenderer.on(channel, (event, errorResult) => receiver(event, errorResult));
+    },
 
     // Auth
     [contextBridgeTypes.Ipc_GetLastOAuthError]: () => ipcRenderer.invoke(contextBridgeTypes.Ipc_GetLastOAuthError),

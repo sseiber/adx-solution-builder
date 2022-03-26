@@ -11,30 +11,54 @@ import {
 import logger from './logger';
 import MenuBuilder from './menu';
 import * as contextBridgeTypes from './contextBridgeTypes';
-import { IIpcResult } from './contextBridgeTypes';
 import store, { StoreKeys } from '../main/store';
 import {
+    IIpcResult
+} from './models/main';
+import {
+    AdxResourceType,
     AdxConfigurationFileType,
-    emptySolution
+    emptySolution,
+    IAdxConfigurationItem,
+    IAdxSolution
 } from './models/adxSolution';
 import {
     IAdapterConfiguration,
     emptyAdapterConfig
 } from './models/industrialConnect';
 import {
+    AzureManagementScope
+} from '../main/models/msalAuth';
+import {
     MsalAuthProvider
 } from './providers/auth/msalAuth';
 import { IoTCentralProvider } from './providers/iotCentral';
 import { IndustrialConnectProvider } from './providers/industrialConnect';
-import { requestApi } from './utils';
+import {
+    requestApi,
+    sleep
+} from './utils';
 import {
     join as pathJoin,
     basename as pathBasename
 } from 'path';
 import { platform as osPlatform } from 'os';
+import axios from 'axios';
 import * as fse from 'fs-extra';
 
 const ModuleName = 'MainApp';
+
+enum AzureResourceApiType {
+    AzureDeployment = 'AzureDeployment',
+    IoTCentralApi = 'IoTCentralApi',
+    AzureDataExplorerApi = 'AzureDataExplorerApi'
+}
+interface IAzureManagementApiResponse {
+    status: number;
+    message: string;
+    headers: any;
+    payload?: any;
+}
 
 // Magic constants produced by Forge's webpack to locate the main entry and preload files.
 declare const MAIN_WINDOW_WEBPACK_ENTRY: string;
@@ -109,11 +133,12 @@ export class MainApp {
     private registerEventHandlers(): void {
         ipcMain.handle(contextBridgeTypes.Ipc_Log, this.log.bind(this));
         ipcMain.handle(contextBridgeTypes.Ipc_OpenConfiguration, this.openConfiguration.bind(this));
+        ipcMain.handle(contextBridgeTypes.Ipc_SaveConfiguration, this.saveConfiguration.bind(this));
         ipcMain.handle(contextBridgeTypes.Ipc_StartProvisioning, this.startProvisioning.bind(this));
         ipcMain.handle(contextBridgeTypes.Ipc_GetAdapterConfiguration, this.getAdapterConfiguration.bind(this));
         ipcMain.handle(contextBridgeTypes.Ipc_SetAdapterConfiguration, this.setAdapterConfiguration.bind(this));
         ipcMain.handle(contextBridgeTypes.Ipc_OpenLink, this.openLink.bind(this));
-        ipcMain.handle(contextBridgeTypes.Ipc_RequestApi, this.requestApi.bind(this));
+        ipcMain.handle(contextBridgeTypes.Ipc_RequestApi, this.internalRequestApi.bind(this));
     }
 
     private async log(_event: IpcMainInvokeEvent, tags: string[], message: string): Promise<void> {
@@ -186,36 +211,135 @@ export class MainApp {
         return result;
     }
 
-    private async startProvisioning(_event: IpcMainInvokeEvent): Promise<IIpcResult> {
-        void this.doProvisioning();
+    private async saveConfiguration(_event: IpcMainInvokeEvent, adxSolution: IAdxSolution): Promise<IIpcResult> {
+        logger.log([ModuleName, 'info'], `saveConfiguration`);
+
+        const result: IIpcResult = {
+            result: true,
+            message: 'Succeeded'
+        };
+
+        try {
+            const configFilePath = store.get(StoreKeys.lastConfiguration);
+
+            if (configFilePath) {
+                fse.writeJSONSync(configFilePath, adxSolution);
+            }
+        }
+        catch (ex) {
+            result.result = false;
+            result.message = `Error saving configuration file: ${ex.message}`;
+
+            logger.log([ModuleName, 'error'], result.message);
+        }
+
+        return result;
+    }
+
+    private async startProvisioning(_event: IpcMainInvokeEvent, adxSolution: IAdxSolution): Promise<IIpcResult> {
+        logger.log([ModuleName, 'info'], `startProvisioning`);
+
+        void this.doProvisioning(adxSolution);
 
         return {
             result: true,
-            message: ''
+            message: 'Provisioning started'
         };
     }
 
-    private async doProvisioning(): Promise<void> {
-        this.mainWindow.webContents.send(contextBridgeTypes.Ipc_StartProvisioningItem, 'c71b8a4c-2cc6-4f88-b986-4a1293989c95');
+    private async doProvisioning(adxSolution: IAdxSolution): Promise<void> {
+        logger.log([ModuleName, 'info'], `Starting doProvisioning loop...`);
 
-        let value = 1;
-        while (value < 10) {
-            this.mainWindow.webContents.send(contextBridgeTypes.Ipc_ProvisionProgress, {
-                label: 'Provisioning...',
-                value,
-                total: 10
-            });
+        const errorResult = {
+            status: 0,
+            title: 'Azure Resource Provisioning',
+            message: ''
+        };
 
-            await new Promise((resolve) => {
-                setTimeout(() => {
-                    return resolve('');
-                }, 1000 * 2);
-            });
+        const subscriptionId = store.get(StoreKeys.subscriptionId);
+        const resourceGroupName = adxSolution.configItems[0].resourceName;
 
-            value += 3;
+        for (const configItem of adxSolution.configItems) {
+            try {
+                this.mainWindow.webContents.send(contextBridgeTypes.Ipc_StartProvisioningItem, configItem.id);
+
+                const config = await this.getRequestApiConfig(configItem, subscriptionId, resourceGroupName, AzureManagementScope);
+                const provisionResponse = await this.azureManagementRequestApi(config);
+
+                if (provisionResponse.status < 200 || provisionResponse.status > 299) {
+                    errorResult.status = provisionResponse.status;
+                    errorResult.message = `Error during provisioning step: ${provisionResponse.message}`;
+                    logger.log([ModuleName, 'error'], errorResult.message);
+
+                    break;
+                }
+
+                logger.log([ModuleName, 'info'], `Request succeeded - checking for long running operation status...`);
+
+                if (configItem.resourceApiType === AzureResourceApiType.AzureDeployment) {
+                    const succeeded = await this.waitForOperationWithStatus(provisionResponse.headers);
+                    if (succeeded) {
+                        this.mainWindow.webContents.send(contextBridgeTypes.Ipc_SaveProvisioningResponse, configItem.id, provisionResponse.payload);
+                    }
+                }
+            }
+            catch (ex) {
+                errorResult.status = 500;
+                errorResult.message = `Error during provisioning step - ${configItem.name}: ${ex.message}`;
+                logger.log([ModuleName, 'error'], errorResult.message);
+            }
+            finally {
+                this.mainWindow.webContents.send(contextBridgeTypes.Ipc_EndProvisioning);
+            }
         }
 
-        this.mainWindow.webContents.send(contextBridgeTypes.Ipc_EndProvisioning);
+        if (errorResult.status) {
+            this.mainWindow.webContents.send(contextBridgeTypes.Ipc_ServiceError, errorResult);
+        }
+
+        logger.log([ModuleName, 'info'], `Leaving doProvisioning loop...`);
+    }
+
+    private async waitForOperationWithStatus(operationHeaders: any): Promise<boolean> {
+        logger.log([ModuleName, 'info'], `waitForOperationWithStatus`);
+
+        const managementUrl = operationHeaders['azure-asyncoperation'] || operationHeaders['location'] || '';
+        const retryAfter = operationHeaders['retry-after'] || 5;
+
+        if (!managementUrl) {
+            return true;
+        }
+
+        let response;
+
+        do {
+            const accessToken = await this.authProvider.getScopedToken(AzureManagementScope);
+            response = await this.azureManagementRequestApi({
+                method: 'get',
+                url: managementUrl,
+                headers: {
+                    Authorization: `Bearer ${accessToken}`
+                }
+            });
+
+            logger.log([ModuleName, 'info'], `Operation status is code: ${response.status}, status: ${response?.payload?.status || 'unknown'}`);
+
+            if ((response.status !== 200 && response.status !== 202) || response?.payload?.status !== 'Running') {
+                break;
+            }
+
+            const value = response.payload?.percentComplete || 0.5;
+
+            this.mainWindow.webContents.send(contextBridgeTypes.Ipc_ProvisionProgress, {
+                label: response.payload.status || 'Provisining...',
+                value: value >= 1 ? value : value * 100,
+                total: 100
+            });
+
+            await sleep(1000 * retryAfter);
+        } while (response.status === 200 || response.status === 202);
+
+        return response?.payload?.status === 'Succeeded';
     }
 
     private async getAdapterConfiguration(_event: IpcMainInvokeEvent, appId: string, deviceId: string): Promise<IAdapterConfiguration> {
@@ -240,7 +364,100 @@ export class MainApp {
         void shell.openExternal(url);
     }
 
-    private async requestApi(_event: IpcMainInvokeEvent, config: any): Promise<any> {
+    private async getRequestApiConfig(configItem: IAdxConfigurationItem, subscriptionId: string, resourceGroupName: string, apiScope: string): Promise<any> {
+        const accessToken = await this.authProvider.getScopedToken(apiScope);
+
+        let config;
+
+        switch (configItem.itemType) {
+            case AdxResourceType.ResourceGroup:
+                config = {
+                    method: 'put',
+                    url: `https://management.azure.com/subscriptions/${subscriptionId}/resourcegroups/${configItem.resourceName}?api-version=2021-04-01`,
+                    headers: {
+                        Authorization: `Bearer ${accessToken}`
+                    },
+                    data: configItem.payload
+                };
+
+                break;
+
+            case AdxResourceType.IoTCentralApp:
+                config = {
+                    method: 'put',
+                    url: `https://management.azure.com/subscriptions/${subscriptionId}/resourceGroups/${resourceGroupName}/providers/Microsoft.IoTCentral/iotApps/${configItem.resourceName}?api-version=2021-06-01`,
+                    headers: {
+                        Authorization: `Bearer ${accessToken}`
+                    },
+                    data: configItem.payload
+                };
+
+                break;
+
+            case AdxResourceType.AzureDataExplorerCluster:
+                config = {
+                    method: 'put',
+                    url: `https://management.azure.com/subscriptions/${subscriptionId}/resourceGroups/${resourceGroupName}/providers/Microsoft.Kusto/clusters/${configItem.resourceName}?api-version=2022-02-01`,
+                    headers: {
+                        Authorization: `Bearer ${accessToken}`
+                    },
+                    data: configItem.payload
+                };
+
+                break;
+
+            case AdxResourceType.VirtualMachine:
+                break;
+        }
+
+        return {
+            ...config,
+            ...{
+                headers: {
+                    Authorization: `Bearer ${accessToken}`
+                }
+            }
+        };
+    }
+
+    private async azureManagementRequestApi(config: any): Promise<IAzureManagementApiResponse> {
+        logger.log([ModuleName, 'info'], `ipcMain ${contextBridgeTypes.Ipc_RequestApi} handler`);
+
+        const apiResponse: IAzureManagementApiResponse = {
+            status: 200,
+            message: '',
+            headers: []
+        };
+
+        try {
+            const axiosResponse = await axios.request(config);
+
+            apiResponse.headers = axiosResponse.headers;
+
+            apiResponse.status = axiosResponse.status;
+            apiResponse.message = axiosResponse.statusText || `${axiosResponse.status}`;
+
+            if (axiosResponse.data) {
+                apiResponse.payload = axiosResponse.data;
+            }
+
+            logger.log([ModuleName, apiResponse.status > 299 ? 'error' : 'info'], `requestApi: status: ${apiResponse.status}`);
+        }
+        catch (ex) {
+            if (ex.isAxiosError && ex.response) {
+                apiResponse.status = ex.response.status;
+                apiResponse.message = ex.response?.data?.error?.message || `An error occurred during the request: ${ex.response.status}`;
+            }
+            else {
+                apiResponse.status = 500;
+                apiResponse.message = `An error occurred during the request: ${ex.message}`;
+            }
+        }
+
+        return apiResponse;
+    }
+
+    private async internalRequestApi(_event: IpcMainInvokeEvent, config: any): Promise<any> {
         logger.log([ModuleName, 'info'], `ipcMain ${contextBridgeTypes.Ipc_RequestApi} handler`);
 
         let response;
