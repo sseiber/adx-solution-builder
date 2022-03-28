@@ -1,4 +1,3 @@
-* prevent doProvision from executing if one is already
 * use a prefix-name for all resource names
    - ask for via dialog
    - specify in config

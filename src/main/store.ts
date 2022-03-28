@@ -11,7 +11,8 @@ export enum StoreKeys {
     graphEndpointHost = 'graphEndpointHost',
     graphMeEndpoint = 'graphMeEndpoint',
     appProtocolName = 'appProtocolName',
-    lastConfiguration = 'lastConfiguration'
+    lastConfiguration = 'lastConfiguration',
+    provisioningState = 'provisioningState'
 }
 
 interface StoreType {
@@ -26,6 +27,7 @@ interface StoreType {
     graphMeEndpoint: string;
     appProtocolName: string;
     lastConfiguration: string;
+    provisioningState: boolean;
 }
 
 const store = new Store<StoreType>({
@@ -40,7 +42,8 @@ const store = new Store<StoreType>({
         graphEndpointHost: 'https://graph.microsoft.com/',
         graphMeEndpoint: 'v1.0/me',
         appProtocolName: '',
-        lastConfiguration: ''
+        lastConfiguration: '',
+        provisioningState: false
     }
 });
 

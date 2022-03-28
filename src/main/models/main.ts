@@ -4,6 +4,11 @@ export interface IIpcResult {
     payload?: any;
 }
 
+export enum ProvisioningState {
+    Active,
+    Inactive
+}
+
 export interface IIpcProgress {
     label: string;
     value: number;
@@ -15,6 +20,12 @@ export interface IErrorResult {
     title: string;
     message: string;
 }
+
+export const emptyProgress: IIpcProgress = {
+    label: '',
+    value: 0,
+    total: 100
+};
 
 export const emptyErrorResult: IErrorResult = {
     status: 0,

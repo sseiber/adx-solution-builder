@@ -23,7 +23,7 @@ const ADXConfigurationItem: FC<IADXConfigurationItemProps> = (props: IADXConfigu
         resourceImageSrc,
         deployingItemId,
         provisioned,
-        // progressTotal,
+        progressTotal,
         progressValue,
         progressLabel
     } = props;
@@ -52,10 +52,11 @@ const ADXConfigurationItem: FC<IADXConfigurationItemProps> = (props: IADXConfigu
                                             <>
                                                 <Progress
                                                     color='blue'
-                                                    percent={progressValue}
-                                                    progress
-                                                    // total={progressTotal}
-                                                    // value={progressValue}
+                                                    size='small'
+                                                    // percent={progressValue}
+                                                    progress='percent'
+                                                    total={progressTotal}
+                                                    value={progressValue}
                                                     active
                                                     content={progressLabel}
                                                 />

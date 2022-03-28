@@ -3,6 +3,7 @@ import { IpcRendererEvent } from 'electron';
 import { AccountInfo } from '@azure/msal-node';
 import {
     IIpcResult,
+    ProvisioningState,
     IIpcProgress,
     IErrorResult
 } from './models/main';
@@ -30,6 +31,7 @@ const Ipc_Log = 'Ipc_Log';
 const Ipc_OpenConfiguration = 'Ipc_OpenConfiguration';
 const Ipc_SaveConfiguration = 'Ipc_SaveConfiguration';
 const Ipc_StartProvisioning = 'Ipc_StartProvisioning';
+const Ipc_ProvisioningState = 'Ipc_ProvisioningState';
 const Ipc_ProvisionProgress = 'Ipc_ProvisionProgress';
 const Ipc_StartProvisioningItem = 'Ipc_StartProvisioningItem';
 const Ipc_SaveProvisioningResponse = 'Ipc_SaveProvisioningResponse';
@@ -71,6 +73,7 @@ declare global {
             [Ipc_OpenConfiguration]: (loadLastConfiguration: boolean) => Promise<IIpcResult>;
             [Ipc_SaveConfiguration]: (adxSolution: IAdxSolution) => Promise<IIpcResult>;
             [Ipc_StartProvisioning]: (adxSolution: IAdxSolution) => Promise<IIpcResult>;
+            [Ipc_ProvisioningState]: () => Promise<ProvisioningState>;
             [Ipc_ProvisionProgress]: (channel: string, receiver: (event: IpcRendererEvent, message: IIpcProgress) => void) => void;
             [Ipc_StartProvisioningItem]: (channel: string, receiver: (event: IpcRendererEvent, itemId: string) => void) => void;
             [Ipc_SaveProvisioningResponse]: (channel: string, receiver: (event: IpcRendererEvent, itemId: string, response: any) => void) => void;
@@ -112,6 +115,7 @@ export {
     Ipc_OpenConfiguration,
     Ipc_SaveConfiguration,
     Ipc_StartProvisioning,
+    Ipc_ProvisioningState,
     Ipc_ProvisionProgress,
     Ipc_StartProvisioningItem,
     Ipc_SaveProvisioningResponse,

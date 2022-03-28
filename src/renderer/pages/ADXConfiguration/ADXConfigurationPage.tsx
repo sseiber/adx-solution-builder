@@ -4,6 +4,7 @@ import { useAsyncEffect } from 'use-async-effect';
 import { Button, Grid } from 'semantic-ui-react';
 import { useStore } from '../../stores/store';
 import { useInfoDialog, showInfoDialog } from '../../components/InfoDialogContext';
+import { ProvisioningState } from '../../../main/models/main';
 import IotCentralPanel from './ADXConfigurationPanel';
 
 const ADXConfigurationPage: FC = observer(() => {
@@ -45,8 +46,23 @@ const ADXConfigurationPage: FC = observer(() => {
         }
     };
 
-    const onStartProvisioning = () => {
-        void mainStore.startProvisioning();
+    const onStartProvisioning = async () => {
+        let confirm = true;
+
+        const currentState = await mainStore.getProvisioningState();
+        if (currentState === ProvisioningState.Active) {
+            confirm = await showInfoDialog(infoDialogContext, {
+                catchOnCancel: true,
+                variant: 'confirm',
+                title: 'Solution Provisioning',
+                actionLabel: 'Start',
+                description: 'A previous solution did not finish all of the provisioning steps. Do you want to attempt to start provisioning anyway?'
+            });
+        }
+
+        if (confirm) {
+            void mainStore.startProvisioning();
+        }
     };
 
     return (
@@ -57,6 +73,8 @@ const ADXConfigurationPage: FC = observer(() => {
                         <IotCentralPanel
                             userDisplayName={sessionStore.displayName}
                             confgurationName={mainStore.adxSolution.name}
+                            resourceSuffixName={mainStore.adxSolution.resourceSuffixName}
+                            mapItemTypeToImageName={mainStore.mapItemTypeToImageName}
                             configItems={mainStore.adxSolution.configItems}
                             deployingItemId={mainStore.deployingItemId}
                             progressTotal={mainStore.provisionProgress.total}

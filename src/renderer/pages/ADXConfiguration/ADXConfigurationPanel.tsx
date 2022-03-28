@@ -1,13 +1,13 @@
 import React, { FC } from 'react';
-import { observer } from 'mobx-react-lite';
 import { Grid, Segment, Header, Message, Item } from 'semantic-ui-react';
-import { useStore } from '../../stores/store';
 import { IAdxConfigurationItem } from '../../../main/models/adxSolution';
 import ADXConfigurationItem from './ADXConfigurationItem';
 
 interface IADXConfigurationPanelProps {
     userDisplayName: string;
     confgurationName: string;
+    resourceSuffixName: string;
+    mapItemTypeToImageName: Map<string, string>;
     configItems: IAdxConfigurationItem[];
     deployingItemId: string;
     progressTotal: number;
@@ -15,19 +15,17 @@ interface IADXConfigurationPanelProps {
     progressLabel: string;
 }
 
-const ADXConfigurationPanel: FC<IADXConfigurationPanelProps> = observer((props: IADXConfigurationPanelProps) => {
+const ADXConfigurationPanel: FC<IADXConfigurationPanelProps> = (props: IADXConfigurationPanelProps) => {
     const {
         confgurationName,
+        resourceSuffixName,
+        mapItemTypeToImageName,
         configItems,
         deployingItemId,
         progressTotal,
         progressValue,
         progressLabel
     } = props;
-
-    const {
-        mainStore
-    } = useStore();
 
     return (
         <Grid>
@@ -52,8 +50,8 @@ const ADXConfigurationPanel: FC<IADXConfigurationPanelProps> = observer((props: 
                                                         key={item.id}
                                                         id={item.id}
                                                         name={item.name}
-                                                        resourceName={item.resourceName}
-                                                        resourceImageSrc={mainStore.mapItemImageFromType.get(item.itemType)}
+                                                        resourceName={`${item.resourceName}${resourceSuffixName}`}
+                                                        resourceImageSrc={mapItemTypeToImageName.get(item.itemType)}
                                                         resourceId={item?.provisionResponse?.id || ''}
                                                         deployingItemId={deployingItemId}
                                                         provisioned={!!item?.provisionResponse?.id}
@@ -77,6 +75,6 @@ const ADXConfigurationPanel: FC<IADXConfigurationPanelProps> = observer((props: 
             </Grid.Row>
         </Grid>
     );
-});
+};
 
 export default ADXConfigurationPanel;

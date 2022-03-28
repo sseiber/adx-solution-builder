@@ -3,8 +3,10 @@ import { makeAutoObservable, runInAction, toJS } from 'mobx';
 import * as contextBridgeTypes from '../../main/contextBridgeTypes';
 import {
     IIpcResult,
+    ProvisioningState,
     IIpcProgress,
     IErrorResult,
+    emptyProgress,
     emptyErrorResult
 } from '../../main/models/main';
 import {
@@ -24,13 +26,14 @@ export class MainStore {
     constructor() {
         makeAutoObservable(this);
 
-        this.mapItemImageFromType = new Map<string, string>();
-        this.mapItemImageFromType.set(AdxResourceType.IoTCentralApp, 'iotcentral.png');
-        this.mapItemImageFromType.set(AdxResourceType.IoTCentralAppFeature, 'iotcentral.png');
-        this.mapItemImageFromType.set(AdxResourceType.AzureDataExplorerCluster, 'adx.png');
-        this.mapItemImageFromType.set(AdxResourceType.AzureDataExplorerFeature, 'adx.png');
-        this.mapItemImageFromType.set(AdxResourceType.VirtualMachine, 'vm.png');
-        this.mapItemImageFromType.set(AdxResourceType.ResourceGroup, 'resourcegroup.png');
+        this.mapItemTypeToImageName = new Map<string, string>();
+        this.mapItemTypeToImageName.set(AdxResourceType.IoTCentralApp, 'iotcentral.png');
+        this.mapItemTypeToImageName.set(AdxResourceType.IoTCentralAppFeature, 'iotcentral.png');
+        this.mapItemTypeToImageName.set(AdxResourceType.AzureDataExplorerCluster, 'adx.png');
+        this.mapItemTypeToImageName.set(AdxResourceType.AzureDataExplorerFeature, 'adx.png');
+        this.mapItemTypeToImageName.set(AdxResourceType.VirtualMachine, 'vm.png');
+        this.mapItemTypeToImageName.set(AdxResourceType.ResourceGroup, 'resourcegroup.png');
+        this.mapItemTypeToImageName.set(AdxResourceType.AzureContainerInstance, 'aci.png');
 
         window.ipcApi[contextBridgeTypes.Ipc_ProvisionProgress](contextBridgeTypes.Ipc_ProvisionProgress, this.onProvisionProgress.bind(this));
         window.ipcApi[contextBridgeTypes.Ipc_StartProvisioningItem](contextBridgeTypes.Ipc_StartProvisioningItem, this.onStartProvisioningItem.bind(this));
@@ -41,13 +44,10 @@ export class MainStore {
 
     public adxSolution: IAdxSolution = emptySolution;
     public serviceError = emptyErrorResult;
-    public mapItemImageFromType: Map<string, string>;
+    public mapItemTypeToImageName: Map<string, string>;
+    public provisioningState = ProvisioningState.Inactive;
     public deployingItemId = '';
-    public provisionProgress: IIpcProgress = {
-        label: '',
-        value: 0,
-        total: 0
-    };
+    public provisionProgress = emptyProgress;
 
     public get isProduction(): boolean {
         return process.env.NODE_ENV === 'production';
@@ -80,6 +80,10 @@ export class MainStore {
     }
 
     public async startProvisioning(): Promise<IIpcResult> {
+        runInAction(() => {
+            this.provisioningState = ProvisioningState.Active;
+        });
+
         const response = await window.ipcApi[contextBridgeTypes.Ipc_StartProvisioning](toJS(this.adxSolution));
 
         return response || {
@@ -88,9 +92,14 @@ export class MainStore {
         };
     }
 
+    public async getProvisioningState(): Promise<ProvisioningState> {
+        return window.ipcApi[contextBridgeTypes.Ipc_ProvisioningState]();
+    }
+
     private onStartProvisioningItem(_event: IpcRendererEvent, itemId: string): void {
         runInAction(() => {
             this.deployingItemId = itemId;
+            this.provisionProgress = emptyProgress;
         });
     }
 
@@ -113,7 +122,9 @@ export class MainStore {
 
     private onEndProvisioning(_event: IpcRendererEvent): void {
         runInAction(() => {
+            this.provisioningState = ProvisioningState.Inactive;
             this.deployingItemId = '';
+            this.provisionProgress = emptyProgress;
         });
     }
 

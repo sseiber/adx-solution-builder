@@ -13,6 +13,7 @@ contextBridge.exposeInMainWorld('ipcApi', {
     [contextBridgeTypes.Ipc_OpenConfiguration]: (loadLastConfiguration) => ipcRenderer.invoke(contextBridgeTypes.Ipc_OpenConfiguration, loadLastConfiguration),
     [contextBridgeTypes.Ipc_SaveConfiguration]: (adxSolution) => ipcRenderer.invoke(contextBridgeTypes.Ipc_SaveConfiguration, adxSolution),
     [contextBridgeTypes.Ipc_StartProvisioning]: (adxSolution) => ipcRenderer.invoke(contextBridgeTypes.Ipc_StartProvisioning, adxSolution),
+    [contextBridgeTypes.Ipc_ProvisioningState]: () => ipcRenderer.invoke(contextBridgeTypes.Ipc_ProvisioningState),
     [contextBridgeTypes.Ipc_ProvisionProgress]: (channel, receiver) => {
         ipcRenderer.on(channel, (event, message) => receiver(event, message));
     },

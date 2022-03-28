@@ -4,6 +4,7 @@ export enum AdxResourceType {
     IoTCentralApp = 'IoTCentralApp',
     IoTCentralAppFeature = 'IoTCentralAppFeature',
     AzureDataExplorerCluster = 'AzureDataExplorerCluster',
+    AzureContainerInstance = 'AzureContainerInstance',
     AzureDataExplorerFeature = 'AzureDataExplorerFeature',
     VirtualMachine = 'VirtualMachine',
     ResourceGroup = 'ResourceGroup'
@@ -23,6 +24,7 @@ export interface IAdxSolution {
     fileType: string;
     name: string;
     id: string;
+    resourceSuffixName: string;
     configItems: IAdxConfigurationItem[];
 }
 
@@ -30,5 +32,6 @@ export const emptySolution: IAdxSolution = {
     fileType: AdxConfigurationFileType,
     name: '',
     id: '',
+    resourceSuffixName: '',
     configItems: []
 };
