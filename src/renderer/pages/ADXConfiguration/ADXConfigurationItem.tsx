@@ -1,10 +1,11 @@
 import React, { FC } from 'react';
-import { Label, Image, Message, Item, Progress, Grid } from 'semantic-ui-react';
+import { Label, Image, Message, Item, Progress, Grid, Divider } from 'semantic-ui-react';
 
 interface IADXConfigurationItemProps {
     key: string;
     id: string;
     name: string;
+    description: string;
     resourceName: string;
     resourceId: string;
     resourceImageSrc: string;
@@ -18,8 +19,8 @@ const ADXConfigurationItem: FC<IADXConfigurationItemProps> = (props: IADXConfigu
     const {
         id,
         name,
+        description,
         resourceName,
-        resourceId,
         resourceImageSrc,
         deployingItemId,
         provisioned,
@@ -34,18 +35,18 @@ const ADXConfigurationItem: FC<IADXConfigurationItemProps> = (props: IADXConfigu
                 <Item.Content>
                     <Grid>
                         <Grid.Row>
-                            <Grid.Column width={10}>
+                            <Grid.Column width='10'>
                                 <Image
                                     floated='left'
                                     style={{ width: '48px', height: 'auto' }}
                                     src={`./assets/${resourceImageSrc}`}
                                 />
-                                <Item.Header>{name}</Item.Header>
-                                <Item.Meta>
-                                    <span>{resourceId}</span>
-                                </Item.Meta>
+                                <div>
+                                    <Item.Header>{name}</Item.Header>
+                                    <Item.Meta>{description}</Item.Meta>
+                                </div>
                             </Grid.Column>
-                            <Grid.Column width={6}>
+                            <Grid.Column width='6'>
                                 {
                                     deployingItemId === id
                                         ? (
@@ -68,20 +69,23 @@ const ADXConfigurationItem: FC<IADXConfigurationItemProps> = (props: IADXConfigu
                         </Grid.Row>
                     </Grid>
                 </Item.Content>
-                {
-                    provisioned
-                        ? (
-                            <Label color='green' ribbon='right' content={'provisioned'} />
-                        )
-                        : null
-                }
+                <Divider hidden />
                 <Item.Extra>
+                    {
+                        provisioned
+                            ? (
+                                <Label color='green'>
+                                    provisioned
+                                </Label>
+                            )
+                            : null
+                    }
                     <Label>
                         {resourceName}
                     </Label>
                 </Item.Extra>
             </Item>
-        </Message>
+        </Message >
     );
 };
 

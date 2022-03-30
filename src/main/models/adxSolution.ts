@@ -13,6 +13,7 @@ export enum AdxResourceType {
 export interface IAdxConfigurationItem {
     id: string;
     name: string;
+    description: string;
     itemType: string;
     resourceApiType: string;
     resourceName: string;

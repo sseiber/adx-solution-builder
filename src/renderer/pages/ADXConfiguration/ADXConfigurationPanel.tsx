@@ -50,6 +50,7 @@ const ADXConfigurationPanel: FC<IADXConfigurationPanelProps> = (props: IADXConfi
                                                         key={item.id}
                                                         id={item.id}
                                                         name={item.name}
+                                                        description={item.description}
                                                         resourceName={`${item.resourceName}${resourceSuffixName}`}
                                                         resourceImageSrc={mapItemTypeToImageName.get(item.itemType)}
                                                         resourceId={item?.provisionResponse?.id || ''}

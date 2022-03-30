@@ -50,7 +50,8 @@ import * as fse from 'fs-extra';
 const ModuleName = 'MainApp';
 
 enum AzureResourceApiType {
-    AzureDeployment = 'AzureDeployment',
+    AzureResourceDeployment = 'AzureResourceDeployment',
+    AzureTemplateDeployment = 'AzureTemplateDeployment',
     IoTCentralApi = 'IoTCentralApi',
     AzureDataExplorerApi = 'AzureDataExplorerApi'
 }
@@ -281,7 +282,25 @@ export class MainApp {
             try {
                 this.mainWindow.webContents.send(contextBridgeTypes.Ipc_StartProvisioningItem, configItem.id);
 
-                const apiConfig = await this.getRequestApiConfig(configItem, adxSolution, subscriptionId, resourceGroupName, AzureManagementScope);
+                let apiConfig;
+
+                if (configItem.resourceApiType === AzureResourceApiType.AzureResourceDeployment) {
+                    apiConfig = await this.getAzureResourceConfig(configItem, adxSolution, subscriptionId, resourceGroupName, AzureManagementScope);
+                }
+                else if (configItem.resourceApiType === AzureResourceApiType.AzureTemplateDeployment) {
+                    const templateParameters = configItem.payload.properties.template.parameters;
+                    templateParameters.dnsLabelPrefix.defaultValue = adxSolution.resourceSuffixName;
+                    templateParameters.adminUsername.defaultValue = `${adxSolution.resourceSuffixName}_admin`;
+                    templateParameters.scopeId.defaultValue = `0ne005635E0`;
+                    templateParameters.deviceId.defaultValue = `adxsb-gateway`;
+                    templateParameters.symmetricKey.defaultValue = `oCb4048GqSP+fihLUyQXJy7NY642sWqW+i23x7scib4=`;
+
+                    apiConfig = await this.getAzureTemplateConfig(configItem, adxSolution, subscriptionId, resourceGroupName, AzureManagementScope);
+                }
+                else {
+                    logger.log([ModuleName, 'error'], `Unknown configuration resource type: ${configItem.resourceApiType}`);
+                    break;
+                }
 
                 const provisionResponse = await this.azureManagementRequestApi(apiConfig);
 
@@ -295,7 +314,8 @@ export class MainApp {
 
                 logger.log([ModuleName, 'info'], `Request succeeded - checking for long running operation status...`);
 
-                if (configItem.resourceApiType === AzureResourceApiType.AzureDeployment) {
+                if (configItem.resourceApiType === AzureResourceApiType.AzureResourceDeployment
+                    || configItem.resourceApiType === AzureResourceApiType.AzureTemplateDeployment) {
                     const succeeded = await this.waitForOperationWithStatus(provisionResponse.headers);
                     if (succeeded) {
                         this.mainWindow.webContents.send(contextBridgeTypes.Ipc_SaveProvisioningResponse, configItem.id, provisionResponse.payload);
@@ -392,8 +412,8 @@ export class MainApp {
         void shell.openExternal(url);
     }
 
-    private async getRequestApiConfig(configItem: IAdxConfigurationItem, adxSolution: IAdxSolution, subscriptionId: string, resourceGroupName: string, apiScope: string): Promise<any> {
-        logger.log([ModuleName, 'info'], `getRequestApiConfig for config item type: ${configItem.itemType}`);
+    private async getAzureResourceConfig(configItem: IAdxConfigurationItem, adxSolution: IAdxSolution, subscriptionId: string, resourceGroupName: string, apiScope: string): Promise<any> {
+        logger.log([ModuleName, 'info'], `getAzureResourceConfig for config item type: ${configItem.itemType}`);
 
         const accessToken = await this.authProvider.getScopedToken(apiScope);
 
@@ -442,6 +462,35 @@ export class MainApp {
                     adxsbid: adxSolution.id
                 }
             }
+        };
+    }
+
+    private async getAzureTemplateConfig(configItem: IAdxConfigurationItem, adxSolution: IAdxSolution, subscriptionId: string, resourceGroupName: string, apiScope: string): Promise<any> {
+        logger.log([ModuleName, 'info'], `getAzureTemplateConfig for config item type: ${configItem.itemType}`);
+
+        const accessToken = await this.authProvider.getScopedToken(apiScope);
+
+        let url;
+        const resourceName = `${configItem.resourceName}${adxSolution.resourceSuffixName}`;
+
+        switch (configItem.itemType) {
+            case AdxResourceType.VirtualMachine:
+                url = `https://management.azure.com/subscriptions/${subscriptionId}/resourcegroups/${resourceGroupName}/providers/Microsoft.Resources/deployments/${resourceName}?api-version=2020-10-01`;
+                break;
+
+            default:
+                logger.log([ModuleName, 'error'], `Unknown config item type: ${configItem.itemType}`);
+                url = '';
+                break;
+        }
+
+        return {
+            method: 'put',
+            url,
+            headers: {
+                Authorization: `Bearer ${accessToken}`
+            },
+            data: configItem.payload
         };
     }
 

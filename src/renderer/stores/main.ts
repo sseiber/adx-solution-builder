@@ -34,6 +34,7 @@ export class MainStore {
         this.mapItemTypeToImageName.set(AdxResourceType.VirtualMachine, 'vm.png');
         this.mapItemTypeToImageName.set(AdxResourceType.ResourceGroup, 'resourcegroup.png');
         this.mapItemTypeToImageName.set(AdxResourceType.AzureContainerInstance, 'aci.png');
+        this.mapItemTypeToImageName.set(AdxResourceType.VirtualMachine, 'vm.png');
 
         window.ipcApi[contextBridgeTypes.Ipc_ProvisionProgress](contextBridgeTypes.Ipc_ProvisionProgress, this.onProvisionProgress.bind(this));
         window.ipcApi[contextBridgeTypes.Ipc_StartProvisioningItem](contextBridgeTypes.Ipc_StartProvisioningItem, this.onStartProvisioningItem.bind(this));

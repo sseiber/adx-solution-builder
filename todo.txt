@@ -1,5 +1,7 @@
-* use a prefix-name for all resource names
-   - ask for via dialog
-   - specify in config
 * when you open the app - re-verify the resources if they are marked as provisioned
+* when you create a resource and it's already there, don't fail
+   - this is either "search for the resource before provisioning"
+   - or, look at the error to see if it indicates that it exists already
 * add links to the provisioned resource to navigate to the site in an external browser
+* IoT App template
+   - https://apps.azureiotcentral.com/build/new/d9b53404-391c-4f2e-9a62-28c9e4bc5c7a
