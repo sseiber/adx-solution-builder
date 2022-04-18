@@ -1,29 +1,29 @@
 import React, { FC } from 'react';
-import { Label, Image, Message, Item, Progress, Grid, Divider } from 'semantic-ui-react';
+import { Image, Message, Item, Progress, Grid, Divider, Label } from 'semantic-ui-react';
+import { IoTCentralBaseDomain } from '../../../main/models/iotCentral';
+import {
+    AdxResourceType,
+    IAdxConfigurationItem
+} from '../../../main/models/adxSolution';
 
 interface IADXConfigurationItemProps {
     key: string;
-    id: string;
-    name: string;
-    description: string;
-    resourceName: string;
-    resourceId: string;
+    openLink: (url: string) => Promise<void>;
+    item: IAdxConfigurationItem;
+    resourceSuffix: string;
     resourceImageSrc: string;
     deployingItemId: string;
-    provisioned: boolean;
     progressTotal: number;
     progressValue: number;
     progressLabel: string;
 }
 const ADXConfigurationItem: FC<IADXConfigurationItemProps> = (props: IADXConfigurationItemProps) => {
     const {
-        id,
-        name,
-        description,
-        resourceName,
+        openLink,
+        item,
+        resourceSuffix,
         resourceImageSrc,
         deployingItemId,
-        provisioned,
         progressTotal,
         progressValue,
         progressLabel
@@ -42,13 +42,13 @@ const ADXConfigurationItem: FC<IADXConfigurationItemProps> = (props: IADXConfigu
                                     src={`./assets/${resourceImageSrc}`}
                                 />
                                 <div>
-                                    <Item.Header>{name}</Item.Header>
-                                    <Item.Meta>{description}</Item.Meta>
+                                    <Item.Header>{item.name}</Item.Header>
+                                    <Item.Meta>{item.description}</Item.Meta>
                                 </div>
                             </Grid.Column>
                             <Grid.Column width='6'>
                                 {
-                                    deployingItemId === id
+                                    deployingItemId === item.id
                                         ? (
                                             <>
                                                 <Progress
@@ -72,17 +72,16 @@ const ADXConfigurationItem: FC<IADXConfigurationItemProps> = (props: IADXConfigu
                 <Divider hidden />
                 <Item.Extra>
                     {
-                        provisioned
-                            ? (
-                                <Label color='green'>
-                                    provisioned
-                                </Label>
-                            )
+                        (item?.provisionResponse?.id || '')
+                            ? <Label color='green'>provisioned</Label>
                             : null
                     }
-                    <Label>
-                        {resourceName}
-                    </Label>
+                    <Label>{`${item.resourceName}${resourceSuffix}`}</Label>
+                    {
+                        (item.itemType === AdxResourceType.IoTCentralApp)
+                            ? <Label as='a' onClick={() => openLink(`https://${resourceSuffix}.${IoTCentralBaseDomain}`)}>{`https://${resourceSuffix}.${IoTCentralBaseDomain}`}</Label>
+                            : null
+                    }
                 </Item.Extra>
             </Item>
         </Message >

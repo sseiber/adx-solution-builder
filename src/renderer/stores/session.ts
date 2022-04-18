@@ -29,7 +29,7 @@ export class SessionStore {
         return process.env.NODE_ENV === 'production';
     }
 
-    public async openConfiguration(): Promise<any> {
+    public async openMsalConfiguration(): Promise<any> {
         return window.ipcApi[contextBridgeTypes.Ipc_GetMsalConfig]();
     }
 

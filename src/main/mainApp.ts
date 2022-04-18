@@ -14,21 +14,29 @@ import * as contextBridgeTypes from './contextBridgeTypes';
 import store, { StoreKeys } from '../main/store';
 import {
     IIpcResult,
-    ProvisioningState
+    ProvisioningState,
+    IAzureManagementApiResponse,
+    IServiceResponse,
+    serviceResponseSucceeded
 } from './models/main';
 import {
-    AdxResourceType,
+    IoTCentralBaseDomain
+} from './models/iotCentral';
+import {
+    AdxDeploymentItem,
     AdxConfigurationFileType,
     emptySolution,
     IAdxConfigurationItem,
-    IAdxSolution
+    IAdxSolution,
+    AzureApiType
 } from './models/adxSolution';
 import {
     IAdapterConfiguration,
     emptyAdapterConfig
 } from './models/industrialConnect';
 import {
-    AzureManagementScope
+    AzureDataExplorerApiScope,
+    AzureManagementScope, IoTCentralApiScope
 } from '../main/models/msalAuth';
 import {
     MsalAuthProvider
@@ -49,19 +57,6 @@ import * as fse from 'fs-extra';
 
 const ModuleName = 'MainApp';
 
-enum AzureResourceApiType {
-    AzureResourceDeployment = 'AzureResourceDeployment',
-    AzureTemplateDeployment = 'AzureTemplateDeployment',
-    IoTCentralApi = 'IoTCentralApi',
-    AzureDataExplorerApi = 'AzureDataExplorerApi'
-}
-interface IAzureManagementApiResponse {
-    status: number;
-    message: string;
-    headers: any;
-    payload?: any;
-}
-
 // Magic constants produced by Forge's webpack to locate the main entry and preload files.
 declare const MAIN_WINDOW_WEBPACK_ENTRY: string;
 declare const MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY: string;
@@ -71,6 +66,8 @@ export class MainApp {
     private authProvider: MsalAuthProvider = null;
     private iotCentralProvider: IoTCentralProvider;
     private industrialConnectProvider: IndustrialConnectProvider;
+    private mapApiTypeToApiScope: Map<string, string> = new Map<string, string>();
+    private mapDeploymentStepProps: Map<string, any> = new Map<string, any>();
 
     constructor() {
         this.registerEventHandlers();
@@ -79,6 +76,10 @@ export class MainApp {
     public async initializeApp(): Promise<void> {
         logger.log([ModuleName, 'info'], `MAIN_WINDOW_WEBPACK_ENTRY: ${MAIN_WINDOW_WEBPACK_ENTRY}`);
         logger.log([ModuleName, 'info'], `MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY: ${MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY}`);
+
+        this.mapApiTypeToApiScope.set(AzureApiType.AzureResourceDeployment, AzureManagementScope);
+        this.mapApiTypeToApiScope.set(AzureApiType.IoTCentralApi, IoTCentralApiScope);
+        this.mapApiTypeToApiScope.set(AzureApiType.AzureDataExplorerApi, AzureDataExplorerApiScope);
 
         // Create the main browser window
         this.createMainWindow();
@@ -134,22 +135,22 @@ export class MainApp {
 
     private registerEventHandlers(): void {
         ipcMain.handle(contextBridgeTypes.Ipc_Log, this.log.bind(this));
-        ipcMain.handle(contextBridgeTypes.Ipc_OpenConfiguration, this.openConfiguration.bind(this));
-        ipcMain.handle(contextBridgeTypes.Ipc_SaveConfiguration, this.saveConfiguration.bind(this));
+        ipcMain.handle(contextBridgeTypes.Ipc_OpenSolution, this.openSolution.bind(this));
+        ipcMain.handle(contextBridgeTypes.Ipc_SaveSolution, this.saveSolution.bind(this));
         ipcMain.handle(contextBridgeTypes.Ipc_StartProvisioning, this.startProvisioning.bind(this));
         ipcMain.handle(contextBridgeTypes.Ipc_ProvisioningState, this.provisioningState.bind(this));
         ipcMain.handle(contextBridgeTypes.Ipc_GetAdapterConfiguration, this.getAdapterConfiguration.bind(this));
         ipcMain.handle(contextBridgeTypes.Ipc_SetAdapterConfiguration, this.setAdapterConfiguration.bind(this));
         ipcMain.handle(contextBridgeTypes.Ipc_OpenLink, this.openLink.bind(this));
-        ipcMain.handle(contextBridgeTypes.Ipc_RequestApi, this.internalRequestApi.bind(this));
+        ipcMain.handle(contextBridgeTypes.Ipc_RequestApi, this.internalApiRequest.bind(this));
     }
 
     private async log(_event: IpcMainInvokeEvent, tags: string[], message: string): Promise<void> {
         logger.log(tags, message);
     }
 
-    private async openConfiguration(_event: IpcMainInvokeEvent, loadLastConfiguration: boolean): Promise<IIpcResult> {
-        logger.log([ModuleName, 'info'], `ipcMain ${contextBridgeTypes.Ipc_OpenConfiguration} handler`);
+    private async openSolution(_event: IpcMainInvokeEvent, loadLastConfiguration: boolean): Promise<IIpcResult> {
+        logger.log([ModuleName, 'info'], `ipcMain ${contextBridgeTypes.Ipc_OpenSolution} handler`);
 
         const result: IIpcResult = {
             result: true,
@@ -206,7 +207,7 @@ export class MainApp {
         }
         catch (ex) {
             result.result = false;
-            result.message = `Error in ipcMain ${contextBridgeTypes.Ipc_OpenConfiguration} handler: ${ex.message}`;
+            result.message = `Error in ipcMain ${contextBridgeTypes.Ipc_OpenSolution} handler: ${ex.message}`;
             result.payload = emptySolution;
 
             logger.log([ModuleName, 'error'], result.message);
@@ -215,7 +216,7 @@ export class MainApp {
         return result;
     }
 
-    private async saveConfiguration(_event: IpcMainInvokeEvent, adxSolution: IAdxSolution): Promise<IIpcResult> {
+    private async saveSolution(_event: IpcMainInvokeEvent, adxSolution: IAdxSolution): Promise<IIpcResult> {
         logger.log([ModuleName, 'info'], `saveConfiguration`);
 
         const result: IIpcResult = {
@@ -260,9 +261,8 @@ export class MainApp {
     private async doProvisioning(adxSolution: IAdxSolution): Promise<void> {
         logger.log([ModuleName, 'info'], `Starting doProvisioning loop...`);
 
-        const errorResult = {
-            status: 0,
-            title: 'Azure Resource Provisioning',
+        let response: IServiceResponse = {
+            status: 200,
             message: ''
         };
 
@@ -276,56 +276,22 @@ export class MainApp {
         await sleep(1000);
 
         const subscriptionId = store.get(StoreKeys.subscriptionId);
-        const resourceGroupName = `${adxSolution.configItems[0].resourceName}${adxSolution.resourceSuffixName}`;
+
+        this.mapDeploymentStepProps.clear();
 
         for (const configItem of adxSolution.configItems) {
             try {
                 this.mainWindow.webContents.send(contextBridgeTypes.Ipc_StartProvisioningItem, configItem.id);
 
-                let apiConfig;
+                logger.log([ModuleName, 'info'], `Processing step: ${configItem.name}, type: ${configItem.resourceApiType}`);
 
-                if (configItem.resourceApiType === AzureResourceApiType.AzureResourceDeployment) {
-                    apiConfig = await this.getAzureResourceConfig(configItem, adxSolution, subscriptionId, resourceGroupName, AzureManagementScope);
-                }
-                else if (configItem.resourceApiType === AzureResourceApiType.AzureTemplateDeployment) {
-                    const templateParameters = configItem.payload.properties.template.parameters;
-                    templateParameters.dnsLabelPrefix.defaultValue = adxSolution.resourceSuffixName;
-                    templateParameters.adminUsername.defaultValue = `${adxSolution.resourceSuffixName}_admin`;
-                    templateParameters.scopeId.defaultValue = `0ne005635E0`;
-                    templateParameters.deviceId.defaultValue = `adxsb-gateway`;
-                    templateParameters.symmetricKey.defaultValue = `oCb4048GqSP+fihLUyQXJy7NY642sWqW+i23x7scib4=`;
-
-                    apiConfig = await this.getAzureTemplateConfig(configItem, adxSolution, subscriptionId, resourceGroupName, AzureManagementScope);
-                }
-                else {
-                    logger.log([ModuleName, 'error'], `Unknown configuration resource type: ${configItem.resourceApiType}`);
-                    break;
-                }
-
-                const provisionResponse = await this.azureManagementRequestApi(apiConfig);
-
-                if (provisionResponse.status < 200 || provisionResponse.status > 299) {
-                    errorResult.status = provisionResponse.status;
-                    errorResult.message = `Error during provisioning step: ${provisionResponse.message}`;
-                    logger.log([ModuleName, 'error'], errorResult.message);
-
-                    break;
-                }
-
-                logger.log([ModuleName, 'info'], `Request succeeded - checking for long running operation status...`);
-
-                if (configItem.resourceApiType === AzureResourceApiType.AzureResourceDeployment
-                    || configItem.resourceApiType === AzureResourceApiType.AzureTemplateDeployment) {
-                    const succeeded = await this.waitForOperationWithStatus(provisionResponse.headers);
-                    if (succeeded) {
-                        this.mainWindow.webContents.send(contextBridgeTypes.Ipc_SaveProvisioningResponse, configItem.id, provisionResponse.payload);
-                    }
-                }
+                response = await this.executeDeploymentStep(configItem, adxSolution, subscriptionId);
             }
             catch (ex) {
-                errorResult.status = 500;
-                errorResult.message = `Error during provisioning step - ${configItem.name}: ${ex.message}`;
-                logger.log([ModuleName, 'error'], errorResult.message);
+                response.status = 500;
+                response.message = `Error during provisioning step - ${configItem.name}: ${ex.message}`;
+
+                logger.log([ModuleName, 'error'], response.message);
             }
             finally {
                 this.mainWindow.webContents.send(contextBridgeTypes.Ipc_ProvisionProgress, {
@@ -337,57 +303,21 @@ export class MainApp {
 
                 this.mainWindow.webContents.send(contextBridgeTypes.Ipc_EndProvisioning);
             }
-        }
 
-        if (errorResult.status) {
-            this.mainWindow.webContents.send(contextBridgeTypes.Ipc_ServiceError, errorResult);
+            if (!serviceResponseSucceeded(response)) {
+                this.mainWindow.webContents.send(contextBridgeTypes.Ipc_ServiceError, {
+                    status: response.status,
+                    title: configItem.itemType,
+                    message: response.message
+                });
+
+                break;
+            }
         }
 
         store.set(StoreKeys.provisioningState, false);
 
         logger.log([ModuleName, 'info'], `Leaving doProvisioning loop...`);
-    }
-
-    private async waitForOperationWithStatus(operationHeaders: any): Promise<boolean> {
-        logger.log([ModuleName, 'info'], `waitForOperationWithStatus`);
-
-        const managementUrl = operationHeaders['azure-asyncoperation'] || operationHeaders['location'] || '';
-        const retryAfter = operationHeaders['retry-after'] || 5;
-
-        if (!managementUrl) {
-            return true;
-        }
-
-        let response;
-
-        do {
-            const accessToken = await this.authProvider.getScopedToken(AzureManagementScope);
-            response = await this.azureManagementRequestApi({
-                method: 'get',
-                url: managementUrl,
-                headers: {
-                    Authorization: `Bearer ${accessToken}`
-                }
-            });
-
-            logger.log([ModuleName, 'info'], `Operation status is code: ${response.status}, status: ${response?.payload?.status || 'unknown'}`);
-
-            if ((response.status !== 200 && response.status !== 202) || response?.payload?.status !== 'Running') {
-                break;
-            }
-
-            const value = response.payload?.percentComplete || 0.5;
-
-            this.mainWindow.webContents.send(contextBridgeTypes.Ipc_ProvisionProgress, {
-                label: response.payload.status || 'Provisining...',
-                value: value >= 1 ? value : value * 100,
-                total: 100
-            });
-
-            await sleep(1000 * retryAfter);
-        } while (response.status === 200 || response.status === 202);
-
-        return response?.payload?.status === 'Succeeded';
     }
 
     private async getAdapterConfiguration(_event: IpcMainInvokeEvent, appId: string, deviceId: string): Promise<IAdapterConfiguration> {
@@ -412,89 +342,302 @@ export class MainApp {
         void shell.openExternal(url);
     }
 
-    private async getAzureResourceConfig(configItem: IAdxConfigurationItem, adxSolution: IAdxSolution, subscriptionId: string, resourceGroupName: string, apiScope: string): Promise<any> {
-        logger.log([ModuleName, 'info'], `getAzureResourceConfig for config item type: ${configItem.itemType}`);
+    private async executeDeploymentStep(configItem: IAdxConfigurationItem, adxSolution: IAdxSolution, subscriptionId: string): Promise<IServiceResponse> {
+        logger.log([ModuleName, 'info'], `executeDeploymentStep for config item type: ${configItem.itemType}`);
 
-        const accessToken = await this.authProvider.getScopedToken(apiScope);
+        let response: IServiceResponse = {
+            status: 200,
+            message: ''
+        };
 
-        let url;
-        const calculatedProperties = configItem.payload.properties || {};
-        const resourceName = `${configItem.resourceName}${adxSolution.resourceSuffixName}`;
+        try {
+            const resourceName = `${configItem.resourceName}${adxSolution.resourceSuffixName}`;
+            const apiConfig: any = {};
 
-        switch (configItem.itemType) {
-            case AdxResourceType.ResourceGroup:
-                url = `https://management.azure.com/subscriptions/${subscriptionId}/resourcegroups/${resourceName}?api-version=2021-04-01`;
-                break;
+            switch (configItem.itemType) {
+                case AdxDeploymentItem.ResourceGroup: {
+                    apiConfig.method = 'put';
+                    apiConfig.url = `https://management.azure.com/subscriptions/${subscriptionId}/resourcegroups/${resourceName}?api-version=2021-04-01`;
+                    apiConfig.data = {
+                        ...configItem.payload,
+                        tags: {
+                            ...(configItem.payload?.tags || {}),
+                            adxsbid: adxSolution.id
+                        }
+                    };
 
-            case AdxResourceType.IoTCentralApp:
-                url = `https://management.azure.com/subscriptions/${subscriptionId}/resourceGroups/${resourceGroupName}/providers/Microsoft.IoTCentral/iotApps/${resourceName}?api-version=2021-06-01`;
-                calculatedProperties.displayName = `${configItem.payload.properties.displayName}${adxSolution.resourceSuffixName}`;
-                calculatedProperties.subdomain = `${configItem.payload.properties.subdomain}${adxSolution.resourceSuffixName}`;
-                break;
-
-            case AdxResourceType.AzureDataExplorerCluster:
-                url = `https://management.azure.com/subscriptions/${subscriptionId}/resourceGroups/${resourceGroupName}/providers/Microsoft.Kusto/clusters/${resourceName}?api-version=2022-02-01`;
-                break;
-
-            case AdxResourceType.AzureContainerInstance:
-                url = `https://management.azure.com/subscriptions/${subscriptionId}/resourceGroups/${resourceGroupName}/providers/Microsoft.ContainerInstance/containerGroups/${resourceName}?api-version=2021-09-01`;
-                calculatedProperties.containers[0].name = `${configItem.payload.properties.containers[0].name}${adxSolution.resourceSuffixName}`;
-                calculatedProperties.ipAddress.dnsNameLabel = `${configItem.payload.properties.ipAddress.dnsNameLabel}${adxSolution.resourceSuffixName}`;
-                break;
-
-            default:
-                logger.log([ModuleName, 'error'], `Unknown config item type: ${configItem.itemType}`);
-                url = '';
-                break;
-        }
-
-        return {
-            method: 'put',
-            url,
-            headers: {
-                Authorization: `Bearer ${accessToken}`
-            },
-            data: {
-                ...configItem.payload,
-                properties: calculatedProperties,
-                tags: {
-                    ...(configItem.payload?.tags || {}),
-                    adxsbid: adxSolution.id
+                    break;
                 }
+
+                case AdxDeploymentItem.IotcCreateApp: {
+                    const resourceGroupName = this.mapDeploymentStepProps.get(AdxDeploymentItem.ResourceGroup).name;
+
+                    apiConfig.method = 'put';
+                    apiConfig.url = `https://management.azure.com/subscriptions/${subscriptionId}/resourceGroups/${resourceGroupName}/providers/Microsoft.IoTCentral/iotApps/${resourceName}?api-version=2021-06-01`;
+                    apiConfig.data.properties.displayName = `${configItem.payload.properties.displayName}${adxSolution.resourceSuffixName}`;
+                    apiConfig.data.properties.subdomain = `${configItem.payload.properties.subdomain}${adxSolution.resourceSuffixName}`;
+                    apiConfig.data = {
+                        ...configItem.payload,
+                        tags: {
+                            ...(configItem.payload?.tags || {}),
+                            adxsbid: adxSolution.id
+                        }
+                    };
+
+                    break;
+                }
+
+                case AdxDeploymentItem.IotcImportEdgeCapabilityModel: {
+                    const subdomain = this.mapDeploymentStepProps.get(AdxDeploymentItem.IotcCreateApp).properties.subdomain;
+
+                    apiConfig.method = 'put';
+                    apiConfig.url = `https://${subdomain}.${IoTCentralBaseDomain}/api/deviceTemplates/${configItem.payload.templateId}?api-version=1.1-preview`;
+                    apiConfig.data = configItem.payload.template;
+
+                    break;
+                }
+
+                case AdxDeploymentItem.IotcRegisterEdgeDevice: {
+                    const subdomain = this.mapDeploymentStepProps.get(AdxDeploymentItem.IotcCreateApp).properties.subdomain;
+
+                    apiConfig.method = 'put';
+                    apiConfig.url = `https://${subdomain}.${IoTCentralBaseDomain}/api/devices/${configItem.payload.deviceId}?api-version=1.1-preview`;
+                    apiConfig.data = configItem.payload.deviceConfig;
+
+                    break;
+                }
+
+                case AdxDeploymentItem.IotcGetEdgeDeviceAttestation: {
+                    apiConfig.method = 'get';
+                    const subdomain = this.mapDeploymentStepProps.get(AdxDeploymentItem.IotcCreateApp).properties.subdomain;
+                    const deviceId = this.mapDeploymentStepProps.get(AdxDeploymentItem.IotcRegisterEdgeDevice).id;
+
+                    apiConfig.url = `https://${subdomain}.${IoTCentralBaseDomain}/api/devices/${deviceId}/credentials?api-version=1.1-preview`;
+
+                    break;
+                }
+
+                case AdxDeploymentItem.VirtualMachine: {
+                    const resourceGroupName = this.mapDeploymentStepProps.get(AdxDeploymentItem.ResourceGroup).name;
+
+                    const templateParameters = configItem.payload.properties.template.parameters;
+                    templateParameters.dnsLabelPrefix.defaultValue = adxSolution.resourceSuffixName;
+                    templateParameters.adminUsername.defaultValue = `${adxSolution.resourceSuffixName}_admin`;
+
+                    const deviceAttestation = this.mapDeploymentStepProps.get(AdxDeploymentItem.IotcGetEdgeDeviceAttestation);
+
+                    templateParameters.scopeId.defaultValue = deviceAttestation.idScope;
+                    templateParameters.deviceId.defaultValue = this.mapDeploymentStepProps.get(AdxDeploymentItem.IotcRegisterEdgeDevice).id;
+                    templateParameters.symmetricKey.defaultValue = deviceAttestation.symmetricKey.primaryKey;
+
+                    apiConfig.method = 'put';
+                    apiConfig.url = `https://management.azure.com/subscriptions/${subscriptionId}/resourcegroups/${resourceGroupName}/providers/Microsoft.Resources/deployments/${resourceName}?api-version=2020-10-01`;
+                    apiConfig.data = {
+                        ...configItem.payload,
+                        tags: {
+                            ...(configItem.payload?.tags || {}),
+                            adxsbid: adxSolution.id
+                        }
+                    };
+
+                    break;
+                }
+
+                case AdxDeploymentItem.IotcRegisterIiotDevice: {
+                    const subdomain = this.mapDeploymentStepProps.get(AdxDeploymentItem.IotcCreateApp).properties.subdomain;
+
+                    apiConfig.method = 'put';
+                    apiConfig.url = `https://${subdomain}.${IoTCentralBaseDomain}/api/devices/${configItem.payload.deviceId}?api-version=1.1-preview`;
+                    apiConfig.data = configItem.payload.deviceConfig;
+
+                    break;
+                }
+
+                case AdxDeploymentItem.IotcGetIiotDeviceAttestation: {
+                    const subdomain = this.mapDeploymentStepProps.get(AdxDeploymentItem.IotcCreateApp).properties.subdomain;
+                    const deviceId = this.mapDeploymentStepProps.get(AdxDeploymentItem.IotcRegisterIiotDevice).id;
+
+                    apiConfig.method = 'get';
+                    apiConfig.url = `https://${subdomain}.${IoTCentralBaseDomain}/api/devices/${deviceId}/credentials?api-version=1.1-preview`;
+
+                    break;
+                }
+
+                case AdxDeploymentItem.IotcProvisionIiotDevice: {
+                    const subdomain = this.mapDeploymentStepProps.get(AdxDeploymentItem.IotcCreateApp).properties.subdomain;
+                    const edgeDeviceId = this.mapDeploymentStepProps.get(AdxDeploymentItem.IotcRegisterEdgeDevice).id;
+
+                    apiConfig.method = 'put';
+                    apiConfig.url = `https://${subdomain}.${IoTCentralBaseDomain}/api/devices/${edgeDeviceId}/modules/${configItem.payload.edgeModuleId}/commands/cmAddOrUpdateAssets?api-version=1.1-preview`;
+                    apiConfig.data = configItem.payload.addOrUpdateAssetRequest;
+
+                    break;
+                }
+
+                case AdxDeploymentItem.AdxCreateCluster: {
+                    const resourceGroupName = this.mapDeploymentStepProps.get(AdxDeploymentItem.ResourceGroup).name;
+
+                    apiConfig.method = 'put';
+                    apiConfig.url = `https://management.azure.com/subscriptions/${subscriptionId}/resourceGroups/${resourceGroupName}/providers/Microsoft.Kusto/clusters/${resourceName}?api-version=2022-02-01`;
+                    apiConfig.data = {
+                        ...configItem.payload,
+                        tags: {
+                            ...(configItem.payload?.tags || {}),
+                            adxsbid: adxSolution.id
+                        }
+                    };
+
+                    break;
+                }
+
+                case AdxDeploymentItem.IotcConfigureCdeDestination: {
+                    // const subdomain = this.mapDeploymentStepProps.get(AdxDeploymentItem.IotcCreateApp).properties.subdomain;
+
+                    // apiConfig.method = 'put';
+                    // apiConfig.url = `https://${subdomain}.${IoTCentralBaseDomain}/api/dataExport/destinations/${configItem.payload.destinationId}?api-version=1.1-preview`;
+                    // apiConfig.data = configItem.payload.addOrUpdateAssetRequest;
+
+                    break;
+                }
+
+                case AdxDeploymentItem.IotcConfigureCdeExport: {
+                    // const subdomain = this.mapDeploymentStepProps.get(AdxDeploymentItem.IotcCreateApp).properties.subdomain;
+
+                    // apiConfig.method = 'put';
+                    // apiConfig.url = `https://${subdomain}.${IoTCentralBaseDomain}/api/dataExport/export/${configItem.payload.exportId}?api-version=1.1-preview`;
+                    // apiConfig.data = configItem.payload.addOrUpdateAssetRequest;
+
+                    break;
+                }
+
+                case AdxDeploymentItem.AdxConfigureDataImport:
+                    // case: configure adx to import dashboards, etc.
+
+                    break;
+
+                default:
+                    response.status = 400;
+                    response.message = `Unknown config item type: ${configItem.itemType}`;
+
+                    logger.log([ModuleName, 'error'], response.message);
             }
-        };
-    }
 
-    private async getAzureTemplateConfig(configItem: IAdxConfigurationItem, adxSolution: IAdxSolution, subscriptionId: string, resourceGroupName: string, apiScope: string): Promise<any> {
-        logger.log([ModuleName, 'info'], `getAzureTemplateConfig for config item type: ${configItem.itemType}`);
+            if (serviceResponseSucceeded(response)) {
+                response = await this.executeApiAndSaveResponse(apiConfig, configItem);
 
-        const accessToken = await this.authProvider.getScopedToken(apiScope);
-
-        let url;
-        const resourceName = `${configItem.resourceName}${adxSolution.resourceSuffixName}`;
-
-        switch (configItem.itemType) {
-            case AdxResourceType.VirtualMachine:
-                url = `https://management.azure.com/subscriptions/${subscriptionId}/resourcegroups/${resourceGroupName}/providers/Microsoft.Resources/deployments/${resourceName}?api-version=2020-10-01`;
-                break;
-
-            default:
-                logger.log([ModuleName, 'error'], `Unknown config item type: ${configItem.itemType}`);
-                url = '';
-                break;
+                this.mapDeploymentStepProps.set(configItem.itemType, response.payload);
+            }
+        }
+        catch (ex) {
+            logger.log([ModuleName, 'error'], `Error in deployment step: ${ex.message}`);
         }
 
-        return {
-            method: 'put',
-            url,
-            headers: {
-                Authorization: `Bearer ${accessToken}`
-            },
-            data: configItem.payload
-        };
+        return response;
     }
 
-    private async azureManagementRequestApi(config: any): Promise<IAzureManagementApiResponse> {
+    private async executeApiAndSaveResponse(apiConfig: any, configItem: IAdxConfigurationItem): Promise<IServiceResponse> {
+        let response: IServiceResponse = {
+            status: 200,
+            message: ''
+        };
+
+        const apiScope = this.mapApiTypeToApiScope.get(configItem.resourceApiType);
+
+        const accessToken = await this.authProvider.getScopedToken(apiScope);
+        if (!accessToken) {
+            response.status = 401;
+            response.message = `Could not retrieve a valid authentication token`;
+
+            logger.log([ModuleName, 'error'], response.message);
+
+            return response;
+        }
+
+        response = await this.executeAzureResourceApiRequest({
+            ...apiConfig,
+            headers: {
+                ...apiConfig.headers,
+                Authorization: `Bearer ${accessToken}`
+            }
+        });
+
+        if (serviceResponseSucceeded(response)) {
+            this.mainWindow.webContents.send(contextBridgeTypes.Ipc_SaveProvisioningResponse, configItem.id, response.payload);
+        }
+
+        return response;
+    }
+
+    private async executeAzureResourceApiRequest(apiConfig: any): Promise<IServiceResponse> {
+        let response = await this.azureManagementApiRequest(apiConfig);
+        if (!serviceResponseSucceeded(response)) {
+            logger.log([ModuleName, 'error'], `Error during provisioning step: ${response.message}`);
+
+            return response;
+        }
+
+        logger.log([ModuleName, 'info'], `Request succeeded - checking for long running operation status...`);
+
+        response = await this.waitForOperationWithStatus(response.headers);
+
+        return response;
+    }
+
+    private async waitForOperationWithStatus(operationHeaders: any): Promise<IServiceResponse> {
+        logger.log([ModuleName, 'info'], `waitForOperationWithStatus`);
+
+        let response: IAzureManagementApiResponse = {
+            status: 200,
+            message: ''
+        };
+
+        try {
+            const managementUrl = operationHeaders['azure-asyncoperation'] || operationHeaders['location'] || '';
+            const retryAfter = operationHeaders['retry-after'] || 5;
+
+            if (!managementUrl) {
+                // not an error
+                return response;
+            }
+
+            do {
+                const accessToken = await this.authProvider.getScopedToken(AzureManagementScope);
+                response = await this.azureManagementApiRequest({
+                    method: 'get',
+                    url: managementUrl,
+                    headers: {
+                        Authorization: `Bearer ${accessToken}`
+                    }
+                });
+
+                logger.log([ModuleName, 'info'], `Operation status is code: ${response.status}, status: ${response?.payload?.status || 'unknown'}`);
+
+                if ((response.status !== 200 && response.status !== 202) || response?.payload?.status !== 'Running') {
+                    break;
+                }
+
+                const value = response.payload?.percentComplete || 0.5;
+
+                this.mainWindow.webContents.send(contextBridgeTypes.Ipc_ProvisionProgress, {
+                    label: response.payload.status || 'Provisining...',
+                    value: value >= 1 ? value : value * 100,
+                    total: 100
+                });
+
+                await sleep(1000 * retryAfter);
+            } while (response.status === 200 || response.status === 202);
+
+            response.message = response?.payload?.status || 'Succeeded';
+        }
+        catch (ex) {
+            response.status = 500;
+            response.message = `An error occurred while waiting for provisioning to complete ${ex.message}`;
+        }
+
+        return response;
+    }
+
+    private async azureManagementApiRequest(config: any): Promise<IAzureManagementApiResponse> {
         logger.log([ModuleName, 'info'], `ipcMain ${contextBridgeTypes.Ipc_RequestApi} handler`);
 
         const apiResponse: IAzureManagementApiResponse = {
@@ -509,29 +652,29 @@ export class MainApp {
             apiResponse.headers = axiosResponse.headers;
 
             apiResponse.status = axiosResponse.status;
-            apiResponse.message = axiosResponse.statusText || `${axiosResponse.status}`;
+            apiResponse.message = axiosResponse.statusText || `${axiosResponse.status} `;
 
             if (axiosResponse.data) {
                 apiResponse.payload = axiosResponse.data;
             }
 
-            logger.log([ModuleName, apiResponse.status > 299 ? 'error' : 'info'], `requestApi: status: ${apiResponse.status}`);
+            logger.log([ModuleName, apiResponse.status > 299 ? 'error' : 'info'], `requestApi: status: ${apiResponse.status} `);
         }
         catch (ex) {
             if (ex.isAxiosError && ex.response) {
                 apiResponse.status = ex.response.status;
-                apiResponse.message = ex.response?.data?.error?.message || `An error occurred during the request: ${ex.response.status}`;
+                apiResponse.message = ex.response?.data?.error?.message || `An error occurred during the request: ${ex.response.status} `;
             }
             else {
                 apiResponse.status = 500;
-                apiResponse.message = `An error occurred during the request: ${ex.message}`;
+                apiResponse.message = `An error occurred during the request: ${ex.message} `;
             }
         }
 
         return apiResponse;
     }
 
-    private async internalRequestApi(_event: IpcMainInvokeEvent, config: any): Promise<any> {
+    private async internalApiRequest(_event: IpcMainInvokeEvent, config: any): Promise<any> {
         logger.log([ModuleName, 'info'], `ipcMain ${contextBridgeTypes.Ipc_RequestApi} handler`);
 
         let response;
@@ -540,7 +683,7 @@ export class MainApp {
             response = await requestApi(config);
         }
         catch (ex) {
-            logger.log([ModuleName, 'error'], `Error during ${contextBridgeTypes.Ipc_RequestApi} handler: ${ex.message}`);
+            logger.log([ModuleName, 'error'], `Error during ${contextBridgeTypes.Ipc_RequestApi} handler: ${ex.message} `);
         }
 
         return response;

@@ -1,16 +1,18 @@
 import React, { FC } from 'react';
 import { Button, Modal } from 'semantic-ui-react';
-import { IErrorResult } from '../../main/models/main';
+import {
+    IServiceError
+} from '../../main/models/main';
 
 interface IServiceErrorModalProps {
-    errorResult: IErrorResult;
+    serviceError: IServiceError;
     action?: string;
     onClose: () => void;
 }
 
 const ServiceErrorModal: FC<IServiceErrorModalProps> = (props: IServiceErrorModalProps) => {
     const {
-        errorResult,
+        serviceError,
         action,
         onClose
     } = props;
@@ -19,11 +21,11 @@ const ServiceErrorModal: FC<IServiceErrorModalProps> = (props: IServiceErrorModa
         <Modal
             closeOnEscape={false}
             closeOnDimmerClick={false}
-            open={!!errorResult.status}
+            open={serviceError.status < 200 || serviceError.status > 299}
         >
-            <Modal.Header>{errorResult.title}</Modal.Header>
+            <Modal.Header>{serviceError.title}</Modal.Header>
             <Modal.Content>
-                <p>{errorResult.message}</p>
+                <p>{serviceError.message}</p>
             </Modal.Content>
             <Modal.Actions>
                 <Button onClick={() => onClose()} positive>

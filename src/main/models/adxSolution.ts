@@ -1,13 +1,25 @@
 export const AdxConfigurationFileType = '7c59ae46-6955-49cd-a81c-45d79cad908e';
 
-export enum AdxResourceType {
-    IoTCentralApp = 'IoTCentralApp',
-    IoTCentralAppFeature = 'IoTCentralAppFeature',
-    AzureDataExplorerCluster = 'AzureDataExplorerCluster',
-    AzureContainerInstance = 'AzureContainerInstance',
-    AzureDataExplorerFeature = 'AzureDataExplorerFeature',
+export enum AzureApiType {
+    AzureResourceDeployment = 'AzureResourceDeployment',
+    IoTCentralApi = 'IoTCentralApi',
+    AzureDataExplorerApi = 'AzureDataExplorerApi'
+}
+
+export enum AdxDeploymentItem {
+    ResourceGroup = 'ResourceGroup',
+    IotcCreateApp = 'IotcCreateApp',
+    IotcImportEdgeCapabilityModel = 'IotcImportEdgeCapabilityModel',
+    IotcRegisterEdgeDevice = 'IotcRegisterEdgeDevice',
+    IotcGetEdgeDeviceAttestation = 'IotcGetEdgeDeviceAttestation',
     VirtualMachine = 'VirtualMachine',
-    ResourceGroup = 'ResourceGroup'
+    IotcRegisterIiotDevice = 'IotcRegisterIiotDevice',
+    IotcGetIiotDeviceAttestation = 'IotcGetIiotDeviceAttestation',
+    IotcProvisionIiotDevice = 'IotcProvisionIiotDevice',
+    AdxCreateCluster = 'AdxCreateCluster',
+    IotcConfigureCdeDestination = 'IotcConfigureCdeDestination',
+    IotcConfigureCdeExport = 'IotcConfigureCdeExport',
+    AdxConfigureDataImport = 'AdxConfigureDataImport'
 }
 
 export interface IAdxConfigurationItem {

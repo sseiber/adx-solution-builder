@@ -10,8 +10,8 @@ const contextBridgeTypes = require('./contextBridgeTypes.ts');
 contextBridge.exposeInMainWorld('ipcApi', {
     // Main
     [contextBridgeTypes.Ipc_Log]: (tags, message) => ipcRenderer.invoke(contextBridgeTypes.Ipc_Log, tags, message),
-    [contextBridgeTypes.Ipc_OpenConfiguration]: (loadLastConfiguration) => ipcRenderer.invoke(contextBridgeTypes.Ipc_OpenConfiguration, loadLastConfiguration),
-    [contextBridgeTypes.Ipc_SaveConfiguration]: (adxSolution) => ipcRenderer.invoke(contextBridgeTypes.Ipc_SaveConfiguration, adxSolution),
+    [contextBridgeTypes.Ipc_OpenSolution]: (loadLastConfiguration) => ipcRenderer.invoke(contextBridgeTypes.Ipc_OpenSolution, loadLastConfiguration),
+    [contextBridgeTypes.Ipc_SaveSolution]: (adxSolution) => ipcRenderer.invoke(contextBridgeTypes.Ipc_SaveSolution, adxSolution),
     [contextBridgeTypes.Ipc_StartProvisioning]: (adxSolution) => ipcRenderer.invoke(contextBridgeTypes.Ipc_StartProvisioning, adxSolution),
     [contextBridgeTypes.Ipc_ProvisioningState]: () => ipcRenderer.invoke(contextBridgeTypes.Ipc_ProvisioningState),
     [contextBridgeTypes.Ipc_ProvisionProgress]: (channel, receiver) => {
@@ -30,7 +30,7 @@ contextBridge.exposeInMainWorld('ipcApi', {
     [contextBridgeTypes.Ipc_SetAdapterConfiguration]: (adapterConfig) => ipcRenderer.invoke(contextBridgeTypes.Ipc_SetAdapterConfiguration, adapterConfig),
     [contextBridgeTypes.Ipc_OpenLink]: (url) => ipcRenderer.invoke(contextBridgeTypes.Ipc_OpenLink, url),
     [contextBridgeTypes.Ipc_ServiceError]: (channel, receiver) => {
-        ipcRenderer.on(channel, (event, errorResult) => receiver(event, errorResult));
+        ipcRenderer.on(channel, (event, error) => receiver(event, error));
     },
 
     // Auth

@@ -5,7 +5,7 @@ import {
     IIpcResult,
     ProvisioningState,
     IIpcProgress,
-    IErrorResult
+    IServiceError
 } from './models/main';
 import {
     IMsalConfig
@@ -28,8 +28,8 @@ import {
 
 // Main
 const Ipc_Log = 'Ipc_Log';
-const Ipc_OpenConfiguration = 'Ipc_OpenConfiguration';
-const Ipc_SaveConfiguration = 'Ipc_SaveConfiguration';
+const Ipc_OpenSolution = 'Ipc_OpenSolution';
+const Ipc_SaveSolution = 'Ipc_SaveSolution';
 const Ipc_StartProvisioning = 'Ipc_StartProvisioning';
 const Ipc_ProvisioningState = 'Ipc_ProvisioningState';
 const Ipc_ProvisionProgress = 'Ipc_ProvisionProgress';
@@ -70,8 +70,8 @@ declare global {
         ipcApi: {
             // Main
             [Ipc_Log]: (tags: string[], message: string) => Promise<void>;
-            [Ipc_OpenConfiguration]: (loadLastConfiguration: boolean) => Promise<IIpcResult>;
-            [Ipc_SaveConfiguration]: (adxSolution: IAdxSolution) => Promise<IIpcResult>;
+            [Ipc_OpenSolution]: (loadLastSolution: boolean) => Promise<IIpcResult>;
+            [Ipc_SaveSolution]: (adxSolution: IAdxSolution) => Promise<IIpcResult>;
             [Ipc_StartProvisioning]: (adxSolution: IAdxSolution) => Promise<IIpcResult>;
             [Ipc_ProvisioningState]: () => Promise<ProvisioningState>;
             [Ipc_ProvisionProgress]: (channel: string, receiver: (event: IpcRendererEvent, message: IIpcProgress) => void) => void;
@@ -81,7 +81,7 @@ declare global {
             [Ipc_GetAdapterConfiguration]: (appId: string, deviceId: string) => Promise<IAdapterConfiguration>;
             [Ipc_SetAdapterConfiguration]: (adapterConfig: IAdapterConfiguration) => Promise<boolean>;
             [Ipc_OpenLink]: (url: string) => Promise<void>;
-            [Ipc_ServiceError]: (channel: string, receiver: (event: IpcRendererEvent, errorResult: IErrorResult) => void) => void;
+            [Ipc_ServiceError]: (channel: string, receiver: (event: IpcRendererEvent, error: IServiceError) => void) => void;
 
             // Auth
             [Ipc_GetLastOAuthError]: () => Promise<string>;
@@ -112,8 +112,8 @@ declare global {
 
 export {
     Ipc_Log,
-    Ipc_OpenConfiguration,
-    Ipc_SaveConfiguration,
+    Ipc_OpenSolution,
+    Ipc_SaveSolution,
     Ipc_StartProvisioning,
     Ipc_ProvisioningState,
     Ipc_ProvisionProgress,

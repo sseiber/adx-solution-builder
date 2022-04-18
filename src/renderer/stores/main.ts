@@ -5,12 +5,12 @@ import {
     IIpcResult,
     ProvisioningState,
     IIpcProgress,
-    IErrorResult,
     emptyProgress,
-    emptyErrorResult
+    IServiceError,
+    emptyServiceError
 } from '../../main/models/main';
 import {
-    AdxResourceType,
+    AdxDeploymentItem,
     IAdxSolution,
     emptySolution
 } from '../../main/models/adxSolution';
@@ -27,14 +27,19 @@ export class MainStore {
         makeAutoObservable(this);
 
         this.mapItemTypeToImageName = new Map<string, string>();
-        this.mapItemTypeToImageName.set(AdxResourceType.IoTCentralApp, 'iotcentral.png');
-        this.mapItemTypeToImageName.set(AdxResourceType.IoTCentralAppFeature, 'iotcentral.png');
-        this.mapItemTypeToImageName.set(AdxResourceType.AzureDataExplorerCluster, 'adx.png');
-        this.mapItemTypeToImageName.set(AdxResourceType.AzureDataExplorerFeature, 'adx.png');
-        this.mapItemTypeToImageName.set(AdxResourceType.VirtualMachine, 'vm.png');
-        this.mapItemTypeToImageName.set(AdxResourceType.ResourceGroup, 'resourcegroup.png');
-        this.mapItemTypeToImageName.set(AdxResourceType.AzureContainerInstance, 'aci.png');
-        this.mapItemTypeToImageName.set(AdxResourceType.VirtualMachine, 'vm.png');
+        this.mapItemTypeToImageName.set(AdxDeploymentItem.ResourceGroup, 'resourcegroup.png');
+        this.mapItemTypeToImageName.set(AdxDeploymentItem.IotcCreateApp, 'iotcentral.png');
+        this.mapItemTypeToImageName.set(AdxDeploymentItem.IotcImportEdgeCapabilityModel, 'iotcentral.png');
+        this.mapItemTypeToImageName.set(AdxDeploymentItem.IotcRegisterEdgeDevice, 'iotcentral.png');
+        this.mapItemTypeToImageName.set(AdxDeploymentItem.IotcGetEdgeDeviceAttestation, 'iotcentral.png');
+        this.mapItemTypeToImageName.set(AdxDeploymentItem.VirtualMachine, 'vm.png');
+        this.mapItemTypeToImageName.set(AdxDeploymentItem.IotcRegisterIiotDevice, 'iotcentral.png');
+        this.mapItemTypeToImageName.set(AdxDeploymentItem.IotcGetIiotDeviceAttestation, 'iotcentral.png');
+        this.mapItemTypeToImageName.set(AdxDeploymentItem.IotcProvisionIiotDevice, 'iotcentral.png');
+        this.mapItemTypeToImageName.set(AdxDeploymentItem.AdxCreateCluster, 'adx.png');
+        this.mapItemTypeToImageName.set(AdxDeploymentItem.IotcConfigureCdeDestination, 'iotcentral.png');
+        this.mapItemTypeToImageName.set(AdxDeploymentItem.IotcConfigureCdeExport, 'iotcentral.png');
+        this.mapItemTypeToImageName.set(AdxDeploymentItem.AdxConfigureDataImport, 'adx.png');
 
         window.ipcApi[contextBridgeTypes.Ipc_ProvisionProgress](contextBridgeTypes.Ipc_ProvisionProgress, this.onProvisionProgress.bind(this));
         window.ipcApi[contextBridgeTypes.Ipc_StartProvisioningItem](contextBridgeTypes.Ipc_StartProvisioningItem, this.onStartProvisioningItem.bind(this));
@@ -44,7 +49,7 @@ export class MainStore {
     }
 
     public adxSolution: IAdxSolution = emptySolution;
-    public serviceError = emptyErrorResult;
+    public serviceError: IServiceError = emptyServiceError;
     public mapItemTypeToImageName: Map<string, string>;
     public provisioningState = ProvisioningState.Inactive;
     public deployingItemId = '';
@@ -56,18 +61,18 @@ export class MainStore {
 
     public clearServiceError(): void {
         runInAction(() => {
-            this.serviceError = emptyErrorResult;
+            this.serviceError = emptyServiceError;
         });
     }
 
-    public setServiceError(errorResult: IErrorResult): void {
+    public setServiceError(error: IServiceError): void {
         runInAction(() => {
-            this.serviceError = errorResult;
+            this.serviceError = error;
         });
     }
 
-    public async openSolution(loadLastConfiguration: boolean): Promise<IIpcResult> {
-        const response = await window.ipcApi[contextBridgeTypes.Ipc_OpenConfiguration](loadLastConfiguration);
+    public async openSolution(loadLastSolution: boolean): Promise<IIpcResult> {
+        const response = await window.ipcApi[contextBridgeTypes.Ipc_OpenSolution](loadLastSolution);
         if (response && response.result && response.payload) {
             runInAction(() => {
                 this.adxSolution = response.payload;
@@ -97,6 +102,10 @@ export class MainStore {
         return window.ipcApi[contextBridgeTypes.Ipc_ProvisioningState]();
     }
 
+    public async openLink(url: string): Promise<void> {
+        void window.ipcApi[contextBridgeTypes.Ipc_OpenLink](url);
+    }
+
     private onStartProvisioningItem(_event: IpcRendererEvent, itemId: string): void {
         runInAction(() => {
             this.deployingItemId = itemId;
@@ -112,7 +121,7 @@ export class MainStore {
             }
         });
 
-        void window.ipcApi[contextBridgeTypes.Ipc_SaveConfiguration](toJS(this.adxSolution));
+        void window.ipcApi[contextBridgeTypes.Ipc_SaveSolution](toJS(this.adxSolution));
     }
 
     private onProvisionProgress(_event: IpcRendererEvent, message: IIpcProgress): void {
@@ -129,9 +138,9 @@ export class MainStore {
         });
     }
 
-    private onServiceError(_event: IpcRendererEvent, errorResult: IErrorResult): void {
+    private onServiceError(_event: IpcRendererEvent, error: IServiceError): void {
         runInAction(() => {
-            this.serviceError = errorResult;
+            this.serviceError = error;
         });
     }
 }

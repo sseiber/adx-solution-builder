@@ -71,9 +71,10 @@ const ADXConfigurationPage: FC = observer(() => {
                 <Grid.Row>
                     <Grid.Column>
                         <IotCentralPanel
+                            openLink={mainStore.openLink}
                             userDisplayName={sessionStore.displayName}
                             confgurationName={mainStore.adxSolution.name}
-                            resourceSuffixName={mainStore.adxSolution.resourceSuffixName}
+                            resourceSuffix={mainStore.adxSolution.resourceSuffixName}
                             mapItemTypeToImageName={mainStore.mapItemTypeToImageName}
                             configItems={mainStore.adxSolution.configItems}
                             deployingItemId={mainStore.deployingItemId}

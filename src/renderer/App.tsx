@@ -155,7 +155,7 @@ const App: FC = observer((props: any) => {
                 </Grid>
                 <Menu fixed="bottom" inverted color="grey" style={{ padding: '1em 5em' }} />
                 <ServiceErrorModal
-                    errorResult={mainStore.serviceError}
+                    serviceError={mainStore.serviceError}
                     onClose={onCloseErrorModal}
                 />
             </InfoDialogServiceProvider>

@@ -4,9 +4,10 @@ import { IAdxConfigurationItem } from '../../../main/models/adxSolution';
 import ADXConfigurationItem from './ADXConfigurationItem';
 
 interface IADXConfigurationPanelProps {
+    openLink: (url: string) => Promise<void>;
     userDisplayName: string;
     confgurationName: string;
-    resourceSuffixName: string;
+    resourceSuffix: string;
     mapItemTypeToImageName: Map<string, string>;
     configItems: IAdxConfigurationItem[];
     deployingItemId: string;
@@ -17,8 +18,9 @@ interface IADXConfigurationPanelProps {
 
 const ADXConfigurationPanel: FC<IADXConfigurationPanelProps> = (props: IADXConfigurationPanelProps) => {
     const {
+        openLink,
         confgurationName,
-        resourceSuffixName,
+        resourceSuffix,
         mapItemTypeToImageName,
         configItems,
         deployingItemId,
@@ -44,18 +46,15 @@ const ADXConfigurationPanel: FC<IADXConfigurationPanelProps> = (props: IADXConfi
                                 ? (
                                     <Item.Group>
                                         {
-                                            configItems.map((item: IAdxConfigurationItem) => {
+                                            configItems.map((item) => {
                                                 return (
                                                     <ADXConfigurationItem
                                                         key={item.id}
-                                                        id={item.id}
-                                                        name={item.name}
-                                                        description={item.description}
-                                                        resourceName={`${item.resourceName}${resourceSuffixName}`}
+                                                        openLink={openLink}
+                                                        item={item}
+                                                        resourceSuffix={resourceSuffix}
                                                         resourceImageSrc={mapItemTypeToImageName.get(item.itemType)}
-                                                        resourceId={item?.provisionResponse?.id || ''}
                                                         deployingItemId={deployingItemId}
-                                                        provisioned={!!item?.provisionResponse?.id}
                                                         progressTotal={progressTotal}
                                                         progressValue={progressValue}
                                                         progressLabel={progressLabel}
