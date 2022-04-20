@@ -1,5 +1,5 @@
 import React, { ReactElement, FC } from 'react';
-import { Image, Message, Item, Progress, Grid, Divider, Label } from 'semantic-ui-react';
+import { Image, Message, Item, Grid, Divider, Label, Segment, Progress } from 'semantic-ui-react';
 import { IoTCentralBaseDomain } from '../../../main/models/iotCentral';
 import {
     AdxDeploymentItem,
@@ -102,7 +102,7 @@ const ADXConfigurationItem: FC<IADXConfigurationItemProps> = (props: IADXConfigu
                                 {
                                     deployingItemId === item.id
                                         ? (
-                                            <>
+                                            <Segment style={{ width: '100%' }} floated='right' textAlign='center' secondary>
                                                 <Progress
                                                     color='blue'
                                                     size='small'
@@ -113,7 +113,7 @@ const ADXConfigurationItem: FC<IADXConfigurationItemProps> = (props: IADXConfigu
                                                     active
                                                     content={progressLabel}
                                                 />
-                                            </>
+                                            </Segment>
                                         )
                                         : null
                                 }
