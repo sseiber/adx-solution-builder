@@ -1,10 +1,9 @@
 import React, { FC } from 'react';
 import { observer } from 'mobx-react-lite';
 import { useAsyncEffect } from 'use-async-effect';
-import { Button, Grid } from 'semantic-ui-react';
+import { Grid } from 'semantic-ui-react';
 import { useStore } from '../../stores/store';
 import { useInfoDialog, showInfoDialog } from '../../components/InfoDialogContext';
-import { ProvisioningState } from '../../../main/models/main';
 import IotCentralPanel from './ADXConfigurationPanel';
 
 const ADXConfigurationPage: FC = observer(() => {
@@ -34,37 +33,6 @@ const ADXConfigurationPage: FC = observer(() => {
         []
     );
 
-    const onOpenSolution = async () => {
-        const result = await mainStore.openSolution(false);
-        if (!result.result && result.message) {
-            await showInfoDialog(infoDialogContext, {
-                catchOnCancel: true,
-                variant: 'info',
-                title: 'Error',
-                description: result.message
-            });
-        }
-    };
-
-    const onStartProvisioning = async () => {
-        let confirm = true;
-
-        const currentState = await mainStore.getProvisioningState();
-        if (currentState === ProvisioningState.Active) {
-            confirm = await showInfoDialog(infoDialogContext, {
-                catchOnCancel: true,
-                variant: 'confirm',
-                title: 'Solution Provisioning',
-                actionLabel: 'Start',
-                description: 'A previous solution did not finish all of the provisioning steps. Do you want to attempt to start provisioning anyway?'
-            });
-        }
-
-        if (confirm) {
-            void mainStore.startProvisioning();
-        }
-    };
-
     return (
         <>
             <Grid style={{ padding: '5em 5em' }}>
@@ -73,7 +41,7 @@ const ADXConfigurationPage: FC = observer(() => {
                         <IotCentralPanel
                             openLink={mainStore.openLink}
                             userDisplayName={sessionStore.displayName}
-                            confgurationName={mainStore.adxSolution.name}
+                            confgurationName={`${mainStore.adxSolution.name}: ${mainStore.adxSolution.resourceSuffixName.toUpperCase()}`}
                             resourceSuffix={mainStore.adxSolution.resourceSuffixName}
                             mapItemTypeToImageName={mainStore.mapItemTypeToImageName}
                             configItems={mainStore.adxSolution.configItems}
@@ -82,12 +50,6 @@ const ADXConfigurationPage: FC = observer(() => {
                             progressValue={mainStore.provisionProgress.value}
                             progressLabel={mainStore.provisionProgress.label}
                         />
-                    </Grid.Column>
-                </Grid.Row>
-                <Grid.Row>
-                    <Grid.Column>
-                        <Button size='tiny' color='green' floated='right' onClick={onOpenSolution}>Open solution</Button>
-                        <Button size='tiny' color='green' floated='left' onClick={onStartProvisioning}>Start Provisioning</Button>
                     </Grid.Column>
                 </Grid.Row>
             </Grid>

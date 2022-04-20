@@ -1,8 +1,8 @@
-import React, { FC } from 'react';
+import React, { ReactElement, FC } from 'react';
 import { Image, Message, Item, Progress, Grid, Divider, Label } from 'semantic-ui-react';
 import { IoTCentralBaseDomain } from '../../../main/models/iotCentral';
 import {
-    AdxResourceType,
+    AdxDeploymentItem,
     IAdxConfigurationItem
 } from '../../../main/models/adxSolution';
 
@@ -28,6 +28,58 @@ const ADXConfigurationItem: FC<IADXConfigurationItemProps> = (props: IADXConfigu
         progressValue,
         progressLabel
     } = props;
+
+    const getLabels = (): ReactElement => {
+        return (
+            <>
+                {
+                    (item?.provisionResponse || '')
+                        ? <Label color='green'>provisioned</Label>
+                        : null
+                }
+                <Label>{`${item.resourceName}${resourceSuffix}`}</Label>
+                {
+                    (item.itemType === AdxDeploymentItem.IotcRegisterEdgeDevice)
+                        ? <Label as='a' onClick={() => openLink(`https://${resourceSuffix}.${IoTCentralBaseDomain}/devices/details/industrial-connect-gw/commands`)}>{item.payload.deviceId}</Label>
+                        : null
+                }
+                {
+                    (item.itemType === AdxDeploymentItem.IotcCreateApp)
+                        ? (
+                            <>
+                                <Label as='a' onClick={() => openLink(`https://${resourceSuffix}.${IoTCentralBaseDomain}`)}>{`https://${resourceSuffix}.${IoTCentralBaseDomain}`}</Label>
+                                <Label as='a' onClick={() => openLink(`https://docs.microsoft.com/en-us/rest/api/iotcentral/2021-11-01-previewcontrolplane/apps/create-or-update`)}>doc</Label>
+                            </>
+                        )
+                        : null
+                }
+                {
+                    (item.itemType === AdxDeploymentItem.IotcImportEdgeCapabilityModel)
+                        // eslint-disable-next-line max-len
+                        ? <Label as='a' onClick={() => openLink(`https://docs.microsoft.com/en-us/rest/api/iotcentral/1.1-previewdataplane/device-templates/create`)}>doc</Label>
+                        : null
+                }
+                {
+                    (item.itemType === AdxDeploymentItem.IotcRegisterEdgeDevice)
+                        // eslint-disable-next-line max-len
+                        ? <Label as='a' onClick={() => openLink(`https://docs.microsoft.com/en-us/rest/api/iotcentral/1.1-previewdataplane/devices/create`)}>doc</Label>
+                        : null
+                }
+                {
+                    (item.itemType === AdxDeploymentItem.IotcGetEdgeDeviceAttestation)
+                        // eslint-disable-next-line max-len
+                        ? <Label as='a' onClick={() => openLink(`https://docs.microsoft.com/en-us/rest/api/iotcentral/1.1-previewdataplane/devices/get-attestation`)}>doc</Label>
+                        : null
+                }
+                {
+                    (item.itemType === AdxDeploymentItem.IotcProvisionIiotDevice)
+                        // eslint-disable-next-line max-len
+                        ? <Label as='a' onClick={() => openLink(`https://${resourceSuffix}.${IoTCentralBaseDomain}/devices/details/opc-anomaly-device/rawdata`)}>{item.payload.addOrUpdateAssetRequest.asset.assetId}</Label>
+                        : null
+                }
+            </>
+        );
+    };
 
     return (
         <Message>
@@ -72,15 +124,7 @@ const ADXConfigurationItem: FC<IADXConfigurationItemProps> = (props: IADXConfigu
                 <Divider hidden />
                 <Item.Extra>
                     {
-                        (item?.provisionResponse?.id || '')
-                            ? <Label color='green'>provisioned</Label>
-                            : null
-                    }
-                    <Label>{`${item.resourceName}${resourceSuffix}`}</Label>
-                    {
-                        (item.itemType === AdxResourceType.IoTCentralApp)
-                            ? <Label as='a' onClick={() => openLink(`https://${resourceSuffix}.${IoTCentralBaseDomain}`)}>{`https://${resourceSuffix}.${IoTCentralBaseDomain}`}</Label>
-                            : null
+                        getLabels()
                     }
                 </Item.Extra>
             </Item>

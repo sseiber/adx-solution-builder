@@ -54,6 +54,7 @@ import {
 import { platform as osPlatform } from 'os';
 import axios from 'axios';
 import * as fse from 'fs-extra';
+import { intervalToDuration } from 'date-fns';
 
 const ModuleName = 'MainApp';
 
@@ -269,7 +270,7 @@ export class MainApp {
         store.set(StoreKeys.provisioningState, true);
 
         this.mainWindow.webContents.send(contextBridgeTypes.Ipc_ProvisionProgress, {
-            label: 'Provisining...',
+            label: 'Provisioning...',
             value: 10,
             total: 100
         });
@@ -295,7 +296,7 @@ export class MainApp {
             }
             finally {
                 this.mainWindow.webContents.send(contextBridgeTypes.Ipc_ProvisionProgress, {
-                    label: 'Provisining step finished',
+                    label: 'Provisioning step finished',
                     value: 100,
                     total: 100
                 });
@@ -374,10 +375,12 @@ export class MainApp {
 
                     apiConfig.method = 'put';
                     apiConfig.url = `https://management.azure.com/subscriptions/${subscriptionId}/resourceGroups/${resourceGroupName}/providers/Microsoft.IoTCentral/iotApps/${resourceName}?api-version=2021-06-01`;
-                    apiConfig.data.properties.displayName = `${configItem.payload.properties.displayName}${adxSolution.resourceSuffixName}`;
-                    apiConfig.data.properties.subdomain = `${configItem.payload.properties.subdomain}${adxSolution.resourceSuffixName}`;
                     apiConfig.data = {
                         ...configItem.payload,
+                        properties: {
+                            displayName: `${configItem.payload.properties.displayName}${adxSolution.resourceSuffixName}`,
+                            subdomain: `${configItem.payload.properties.subdomain}${adxSolution.resourceSuffixName}`
+                        },
                         tags: {
                             ...(configItem.payload?.tags || {}),
                             adxsbid: adxSolution.id
@@ -463,13 +466,81 @@ export class MainApp {
                     break;
                 }
 
+                case AdxDeploymentItem.IotEdgeRuntimeStartup: {
+                    const subdomain = this.mapDeploymentStepProps.get(AdxDeploymentItem.IotcCreateApp).properties.subdomain;
+                    const moduleId = this.mapDeploymentStepProps.get(AdxDeploymentItem.IotcRegisterEdgeDevice).id;
+                    const opcEndpoint = `${subdomain}.westus2.cloudapp.azure.com`; // this.mapDeploymentStepProps.get(AdxDeploymentItem.VirtualMachine);
+                    const opcEndpointParameter = configItem.payload.testConnectionRequest.opcEndpoint;
+                    opcEndpointParameter.uri = `opc.tcp://${opcEndpoint}:50000`;
+
+                    apiConfig.method = 'post';
+                    apiConfig.url = `https://${subdomain}.${IoTCentralBaseDomain}/api/devices/${moduleId}/modules/${configItem.payload.moduleName}/commands/cmTestConnection?api-version=1.1-preview`;
+                    apiConfig.data = {
+                        connectionTimeout: 5,
+                        responseTimeout: 5,
+                        request: configItem.payload.testConnectionRequest
+                    };
+
+                    const startTime = Date.now();
+                    let waitingForIoTEdgeRuntime = true;
+                    do {
+                        const waitResponse = await this.executeApi(apiConfig, configItem);
+                        if (serviceResponseSucceeded(waitResponse) && waitResponse.payload?.response?.status === 200 && (waitResponse.payload?.response?.message || '').startsWith('testConnection succeeded')) {
+                            waitingForIoTEdgeRuntime = false;
+
+                            break;
+                        }
+
+                        const waitSeconds = intervalToDuration({
+                            start: startTime,
+                            end: Date.now()
+                        }).seconds;
+
+                        logger.log([ModuleName, 'info'], `Waiting for IoT Edge runtime startup - elapsed ${waitSeconds} sec....`);
+
+                        this.mainWindow.webContents.send(contextBridgeTypes.Ipc_ProvisionProgress, {
+                            label: 'Provisioning...',
+                            value: Math.floor((waitSeconds * 100) / (60 * 5)),
+                            total: 100
+                        });
+
+                        // wait for Azure IoT Edge runtime to startup and provision the manifest (5min. max)
+                        if (waitSeconds > (60 * 5)) {
+                            response.status = 500;
+                            response.message = 'The Azure IoT runtime is taking longer than expected. You can try to provision the remaining steps manually. See the README for help with this.';
+
+                            break;
+                        }
+                        await sleep(3000);
+                    } while (waitingForIoTEdgeRuntime);
+
+                    break;
+                }
+
                 case AdxDeploymentItem.IotcProvisionIiotDevice: {
                     const subdomain = this.mapDeploymentStepProps.get(AdxDeploymentItem.IotcCreateApp).properties.subdomain;
                     const edgeDeviceId = this.mapDeploymentStepProps.get(AdxDeploymentItem.IotcRegisterEdgeDevice).id;
 
-                    apiConfig.method = 'put';
+                    const iiotDeviceAttestation = this.mapDeploymentStepProps.get(AdxDeploymentItem.IotcGetIiotDeviceAttestation);
+                    const deviceCredentialParameters = configItem.payload.addOrUpdateAssetRequest.asset.deviceCredentials;
+                    deviceCredentialParameters.idScope = iiotDeviceAttestation.idScope;
+                    deviceCredentialParameters.primaryKey = iiotDeviceAttestation.symmetricKey.primaryKey;
+                    deviceCredentialParameters.secondaryKey = iiotDeviceAttestation.symmetricKey.secondaryKey;
+
+                    const opcEndpoint = `${subdomain}.westus2.cloudapp.azure.com`; // this.mapDeploymentStepProps.get(AdxDeploymentItem.VirtualMachine);
+                    const opcEndpointParameter = configItem.payload.addOrUpdateAssetRequest.asset.opcEndpoint;
+                    opcEndpointParameter.uri = `opc.tcp://${opcEndpoint}:50000`;
+
+
+                    apiConfig.method = 'post';
                     apiConfig.url = `https://${subdomain}.${IoTCentralBaseDomain}/api/devices/${edgeDeviceId}/modules/${configItem.payload.edgeModuleId}/commands/cmAddOrUpdateAssets?api-version=1.1-preview`;
-                    apiConfig.data = configItem.payload.addOrUpdateAssetRequest;
+                    apiConfig.data = {
+                        connectionTimeout: 30,
+                        responseTimeout: 30,
+                        request: [
+                            configItem.payload.addOrUpdateAssetRequest
+                        ]
+                    };
 
                     break;
                 }
@@ -522,10 +593,12 @@ export class MainApp {
                     logger.log([ModuleName, 'error'], response.message);
             }
 
-            if (serviceResponseSucceeded(response)) {
-                response = await this.executeApiAndSaveResponse(apiConfig, configItem);
+            if (serviceResponseSucceeded(response) && configItem.itemType !== AdxDeploymentItem.IotEdgeRuntimeStartup) {
+                response = await this.executeApi(apiConfig, configItem);
 
                 this.mapDeploymentStepProps.set(configItem.itemType, response.payload);
+
+                this.mainWindow.webContents.send(contextBridgeTypes.Ipc_SaveProvisioningResponse, configItem.id, response.payload);
             }
         }
         catch (ex) {
@@ -535,7 +608,7 @@ export class MainApp {
         return response;
     }
 
-    private async executeApiAndSaveResponse(apiConfig: any, configItem: IAdxConfigurationItem): Promise<IServiceResponse> {
+    private async executeApi(apiConfig: any, configItem: IAdxConfigurationItem): Promise<IServiceResponse> {
         let response: IServiceResponse = {
             status: 200,
             message: ''
@@ -553,34 +626,40 @@ export class MainApp {
             return response;
         }
 
-        response = await this.executeAzureResourceApiRequest({
+        const apiConfigWithAuthToken = {
             ...apiConfig,
             headers: {
                 ...apiConfig.headers,
                 Authorization: `Bearer ${accessToken}`
             }
-        });
+        };
 
-        if (serviceResponseSucceeded(response)) {
-            this.mainWindow.webContents.send(contextBridgeTypes.Ipc_SaveProvisioningResponse, configItem.id, response.payload);
+        if (configItem.resourceApiType === AzureApiType.AzureResourceDeployment) {
+            response = await this.executeAzureResourceApiRequest(apiConfigWithAuthToken);
+        }
+        else {
+            response = await this.azureApiRequest(apiConfigWithAuthToken);
         }
 
         return response;
     }
 
     private async executeAzureResourceApiRequest(apiConfig: any): Promise<IServiceResponse> {
-        let response = await this.azureManagementApiRequest(apiConfig);
-        if (!serviceResponseSucceeded(response)) {
-            logger.log([ModuleName, 'error'], `Error during provisioning step: ${response.message}`);
+        const mainResponse = await this.azureApiRequest(apiConfig);
+        if (!serviceResponseSucceeded(mainResponse)) {
+            logger.log([ModuleName, 'error'], `Error during provisioning step: ${mainResponse.message}`);
 
-            return response;
+            return mainResponse;
         }
 
         logger.log([ModuleName, 'info'], `Request succeeded - checking for long running operation status...`);
 
-        response = await this.waitForOperationWithStatus(response.headers);
+        const lroResponse = await this.waitForOperationWithStatus(mainResponse.headers);
+        if (!serviceResponseSucceeded(lroResponse)) {
+            logger.log([ModuleName, 'warning'], `Long running operation status returned an error - ${lroResponse.status}`);
+        }
 
-        return response;
+        return mainResponse;
     }
 
     private async waitForOperationWithStatus(operationHeaders: any): Promise<IServiceResponse> {
@@ -602,7 +681,7 @@ export class MainApp {
 
             do {
                 const accessToken = await this.authProvider.getScopedToken(AzureManagementScope);
-                response = await this.azureManagementApiRequest({
+                response = await this.azureApiRequest({
                     method: 'get',
                     url: managementUrl,
                     headers: {
@@ -619,7 +698,7 @@ export class MainApp {
                 const value = response.payload?.percentComplete || 0.5;
 
                 this.mainWindow.webContents.send(contextBridgeTypes.Ipc_ProvisionProgress, {
-                    label: response.payload.status || 'Provisining...',
+                    label: response.payload.status || 'Provisioning...',
                     value: value >= 1 ? value : value * 100,
                     total: 100
                 });
@@ -637,7 +716,7 @@ export class MainApp {
         return response;
     }
 
-    private async azureManagementApiRequest(config: any): Promise<IAzureManagementApiResponse> {
+    private async azureApiRequest(config: any): Promise<IAzureManagementApiResponse> {
         logger.log([ModuleName, 'info'], `ipcMain ${contextBridgeTypes.Ipc_RequestApi} handler`);
 
         const apiResponse: IAzureManagementApiResponse = {

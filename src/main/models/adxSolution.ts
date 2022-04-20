@@ -15,6 +15,7 @@ export enum AdxDeploymentItem {
     VirtualMachine = 'VirtualMachine',
     IotcRegisterIiotDevice = 'IotcRegisterIiotDevice',
     IotcGetIiotDeviceAttestation = 'IotcGetIiotDeviceAttestation',
+    IotEdgeRuntimeStartup = 'IotEdgeRuntimeStartup',
     IotcProvisionIiotDevice = 'IotcProvisionIiotDevice',
     AdxCreateCluster = 'AdxCreateCluster',
     IotcConfigureCdeDestination = 'IotcConfigureCdeDestination',

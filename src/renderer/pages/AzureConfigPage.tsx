@@ -99,7 +99,7 @@ const AzureConfigPage: FC = observer(() => {
     };
 
     const onCancel = () => {
-        navigate(AppNavigationPaths.Root);
+        navigate(AppNavigationPaths.ADXConfig);
     };
 
     return (
@@ -157,8 +157,8 @@ const AzureConfigPage: FC = observer(() => {
             </Grid.Row>
             <Grid.Row>
                 <Grid.Column>
-                    <Button size='tiny' onClick={onCancel}>Cancel</Button>
-                    <Button size='tiny' color='green' onClick={onOk}>OK</Button>
+                    <Button style={{ width: '100px' }} floated='right' size='small' color='green' onClick={onOk}>OK</Button>
+                    <Button style={{ width: '100px' }} floated='right' size='small' onClick={onCancel}>Cancel</Button>
                 </Grid.Column>
             </Grid.Row>
         </Grid>

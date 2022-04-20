@@ -5,3 +5,7 @@
 * add links to the provisioned resource to navigate to the site in an external browser
 * IoT App template
    - https://apps.azureiotcentral.com/build/new/d9b53404-391c-4f2e-9a62-28c9e4bc5c7a
+* query for vm public dns endpoint (currently assumed)
+* query for kusto public cluster endpoint and ingestion endpoint (currently assumed)
+* include more provision parameters (to a limit) like location
+* boot strap app initialization to create the tenant app registration to act on behalf of the user

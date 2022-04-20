@@ -1,10 +1,10 @@
 import React, { FC } from 'react';
-import { Routes, Route, useParams, useLocation, useNavigate, Link, Navigate } from 'react-router-dom';
+import { Routes, Route, useParams, useLocation, useNavigate, Navigate } from 'react-router-dom';
 import { observer } from 'mobx-react-lite';
-import { Menu, Grid, Image, Icon, Dropdown } from 'semantic-ui-react';
+import { Menu, Grid, Icon, Dropdown } from 'semantic-ui-react';
 import { useAsyncEffect } from 'use-async-effect';
 import { useStore } from './stores/store';
-import { InfoDialogServiceProvider } from './components/InfoDialogContext';
+import { InfoDialogServiceProvider, useInfoDialog, showInfoDialog } from './components/InfoDialogContext';
 import { AuthenticationState } from './stores/session';
 import AuthenticatedRoute from './components/AuthenticatedRoute';
 import HomePage from './pages/HomePage';
@@ -13,6 +13,7 @@ import ADXConfigurationPage from './pages/ADXConfiguration/ADXConfigurationPage'
 import { ErrorBoundary } from './components/ErrorBoundary';
 import ServiceErrorModal from './components/ServiceErrorModal';
 import { log } from './utils';
+import { ProvisioningState } from '../main/models/main';
 
 const ModuleName = 'App';
 
@@ -26,6 +27,7 @@ const App: FC = observer((props: any) => {
     const params = useParams();
     const navigate = useNavigate();
     const location = useLocation();
+    const infoDialogContext = useInfoDialog();
     const {
         mainStore,
         sessionStore
@@ -76,8 +78,39 @@ const App: FC = observer((props: any) => {
         mainStore.clearServiceError();
     };
 
-    const logoMenuTitle = sessionStore.authenticationState === AuthenticationState.Authenticated ? `Home` : `Azure IoT Central`;
-    const logoMenuLink = sessionStore.authenticationState === AuthenticationState.Authenticated ? AppNavigationPaths.ADXConfig : AppNavigationPaths.Root;
+    const onOpenSolution = async () => {
+        const result = await mainStore.openSolution(false);
+        if (!result.result && result.message) {
+            await showInfoDialog(infoDialogContext, {
+                catchOnCancel: true,
+                variant: 'info',
+                title: 'Error',
+                description: result.message
+            });
+        }
+    };
+
+    const onStartProvisioning = async () => {
+        const confirm = true;
+
+        const currentState = await mainStore.getProvisioningState();
+        if (currentState === ProvisioningState.Active) {
+            // confirm = await showInfoDialog(infoDialogContext, {
+            //     catchOnCancel: true,
+            //     variant: 'confirm',
+            //     title: 'Solution Provisioning',
+            //     actionLabel: 'Start',
+            //     description: 'A previous solution did not finish all of the provisioning steps. Do you want to attempt to start provisioning anyway?'
+            // });
+        }
+
+        if (confirm) {
+            void mainStore.startProvisioning();
+        }
+    };
+
+    // const logoMenuTitle = sessionStore.authenticationState === AuthenticationState.Authenticated ? `Home` : `Azure IoT Central`;
+    // const logoMenuLink = sessionStore.authenticationState === AuthenticationState.Authenticated ? AppNavigationPaths.ADXConfig : AppNavigationPaths.Root;
     const userNavItem = sessionStore.authenticationState === AuthenticationState.Authenticated
         ? (
             <Dropdown item trigger={(
@@ -120,6 +153,37 @@ const App: FC = observer((props: any) => {
             </Dropdown>
         );
 
+    let pageNavItem;
+
+    if (sessionStore.authenticationState === AuthenticationState.Authenticated) {
+        const navMenuTrigger = (
+            <span><Icon name={'list'} /> Solution</span>
+        );
+
+        pageNavItem = (
+            <Dropdown item trigger={navMenuTrigger}>
+                <Dropdown.Menu>
+                    < Dropdown.Item onClick={onOpenSolution}>
+                        <Icon name="folder open" />
+                        <span>&nbsp;&nbsp;Open Solution</span>
+                    </Dropdown.Item>
+                    < Dropdown.Item onClick={onStartProvisioning}>
+                        <Icon name="arrow circle right" />
+                        <span>&nbsp;&nbsp;Start Provisioning</span>
+                    </Dropdown.Item>
+                </Dropdown.Menu>
+            </Dropdown >
+        );
+    }
+    else {
+        pageNavItem = (
+            <Menu.Item>
+                <Icon name="bars" />
+                <span>&nbsp;&nbsp;Home</span>
+            </Menu.Item>
+        );
+    }
+
     const {
         children
     } = props;
@@ -128,10 +192,9 @@ const App: FC = observer((props: any) => {
         <ErrorBoundary>
             <InfoDialogServiceProvider>
                 <Menu fixed="top" inverted color="grey" style={{ padding: '0em 5em' }}>
-                    <Menu.Item as={Link} to={logoMenuLink} header>
-                        <Image size="mini" src={`./assets/icons/64x64.png`} style={{ marginRight: '1.5em' }} />
-                        {logoMenuTitle}
-                    </Menu.Item>
+                    <Menu.Menu position="left">
+                        {pageNavItem}
+                    </Menu.Menu>
                     <Menu.Menu position="right">
                         {userNavItem}
                     </Menu.Menu>

@@ -35,6 +35,7 @@ export class MainStore {
         this.mapItemTypeToImageName.set(AdxDeploymentItem.VirtualMachine, 'vm.png');
         this.mapItemTypeToImageName.set(AdxDeploymentItem.IotcRegisterIiotDevice, 'iotcentral.png');
         this.mapItemTypeToImageName.set(AdxDeploymentItem.IotcGetIiotDeviceAttestation, 'iotcentral.png');
+        this.mapItemTypeToImageName.set(AdxDeploymentItem.IotEdgeRuntimeStartup, 'iotedge.png');
         this.mapItemTypeToImageName.set(AdxDeploymentItem.IotcProvisionIiotDevice, 'iotcentral.png');
         this.mapItemTypeToImageName.set(AdxDeploymentItem.AdxCreateCluster, 'adx.png');
         this.mapItemTypeToImageName.set(AdxDeploymentItem.IotcConfigureCdeDestination, 'iotcentral.png');
