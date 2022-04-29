@@ -4,27 +4,19 @@ import { AccountInfo } from '@azure/msal-node';
 import {
     IIpcResult,
     ProvisioningState,
-    IIpcProgress,
     IServiceError
 } from './models/main';
 import {
     IMsalConfig
 } from '../main/models/msalAuth';
 import {
-    IAdxSolution
-} from '../main/models/adxSolution';
+    ISbSolution
+} from './models/sbSolution';
 import {
     IIotCentralApp,
     IIotCentralDevice,
     IIotCentralModule
 } from '../main/models/iotCentral';
-import {
-    IIndustrialDirectMethodResponse,
-    IApiContext,
-    IEndpoint,
-    IBrowseNodesRequest,
-    IAdapterConfiguration
-} from '../main/models/industrialConnect';
 
 // Main
 const Ipc_Log = 'Ipc_Log';
@@ -36,8 +28,6 @@ const Ipc_ProvisionProgress = 'Ipc_ProvisionProgress';
 const Ipc_StartProvisioningItem = 'Ipc_StartProvisioningItem';
 const Ipc_SaveProvisioningResponse = 'Ipc_SaveProvisioningResponse';
 const Ipc_EndProvisioning = 'Ipc_EndProvisioning';
-const Ipc_GetAdapterConfiguration = 'Ipc_GetAdapterConfiguration';
-const Ipc_SetAdapterConfiguration = 'Ipc_SetAdapterConfiguration';
 const Ipc_OpenLink = 'Ipc_OpenLink';
 const Ipc_ServiceError = 'Ipc_ServiceError';
 
@@ -57,12 +47,7 @@ const Ipc_GetIotcApps = 'Ipc_GetIotcApps';
 const Ipc_GetIotcDevices = 'Ipc_GetIotcDevices';
 const Ipc_GetIotcDeviceModules = 'Ipc_GetIotcDeviceModules';
 
-// Industrial Connect
-const Ipc_TestConnection = 'Ipc_TestConnection';
-const Ipc_TestConnectionProgress = 'Ipc_TestConnectionProgress';
-const Ipc_FetchNodes = 'Ipc_FetchNodes';
-const Ipc_FetchNodesProgress = 'Ipc_FetchNodesProgress';
-
+// Misc.
 const Ipc_ReceiveMessage = 'Ipc_ReceiveMessage';
 
 declare global {
@@ -71,15 +56,13 @@ declare global {
             // Main
             [Ipc_Log]: (tags: string[], message: string) => Promise<void>;
             [Ipc_OpenSolution]: (loadLastSolution: boolean) => Promise<IIpcResult>;
-            [Ipc_SaveSolution]: (adxSolution: IAdxSolution) => Promise<IIpcResult>;
-            [Ipc_StartProvisioning]: (adxSolution: IAdxSolution) => Promise<IIpcResult>;
+            [Ipc_SaveSolution]: (sbSolution: ISbSolution) => Promise<IIpcResult>;
+            [Ipc_StartProvisioning]: (sbSolution: ISbSolution) => Promise<IIpcResult>;
             [Ipc_ProvisioningState]: () => Promise<ProvisioningState>;
-            [Ipc_ProvisionProgress]: (channel: string, receiver: (event: IpcRendererEvent, message: IIpcProgress) => void) => void;
+            [Ipc_ProvisionProgress]: (channel: string, receiver: (event: IpcRendererEvent, message: string) => void) => void;
             [Ipc_StartProvisioningItem]: (channel: string, receiver: (event: IpcRendererEvent, itemId: string) => void) => void;
             [Ipc_SaveProvisioningResponse]: (channel: string, receiver: (event: IpcRendererEvent, itemId: string, response: any) => void) => void;
             [Ipc_EndProvisioning]: (channel: string, receiver: (event: IpcRendererEvent) => void) => void;
-            [Ipc_GetAdapterConfiguration]: (appId: string, deviceId: string) => Promise<IAdapterConfiguration>;
-            [Ipc_SetAdapterConfiguration]: (adapterConfig: IAdapterConfiguration) => Promise<boolean>;
             [Ipc_OpenLink]: (url: string) => Promise<void>;
             [Ipc_ServiceError]: (channel: string, receiver: (event: IpcRendererEvent, error: IServiceError) => void) => void;
 
@@ -99,12 +82,7 @@ declare global {
             [Ipc_GetIotcDevices]: (appSubDomain: string, appId: string) => Promise<IIotCentralDevice[]>;
             [Ipc_GetIotcDeviceModules]: (appSubdomain: string, deviceId: string) => Promise<IIotCentralModule[]>;
 
-            // Industrial Connect
-            [Ipc_TestConnection]: (apiContext: IApiContext, opcEndpoint: IEndpoint) => Promise<IIndustrialDirectMethodResponse>;
-            [Ipc_TestConnectionProgress]: (channel: string, receiver: (event: IpcRendererEvent, message: IIpcProgress) => void) => void;
-            [Ipc_FetchNodes]: (apiContext: IApiContext, browseNodesRequest: IBrowseNodesRequest) => Promise<IIndustrialDirectMethodResponse>;
-            [Ipc_FetchNodesProgress]: (channel: string, receiver: (event: IpcRendererEvent, message: IIpcProgress) => void) => void;
-
+            // Misc.
             [Ipc_ReceiveMessage]: (channel: string, receiver: (event: IpcRendererEvent, ...args: any[]) => void) => void;
         };
     }
@@ -120,8 +98,6 @@ export {
     Ipc_StartProvisioningItem,
     Ipc_SaveProvisioningResponse,
     Ipc_EndProvisioning,
-    Ipc_GetAdapterConfiguration,
-    Ipc_SetAdapterConfiguration,
     Ipc_OpenLink,
     Ipc_ServiceError,
     Ipc_GetLastOAuthError,
@@ -136,9 +112,5 @@ export {
     Ipc_GetIotcApps,
     Ipc_GetIotcDevices,
     Ipc_GetIotcDeviceModules,
-    Ipc_TestConnection,
-    Ipc_TestConnectionProgress,
-    Ipc_FetchNodes,
-    Ipc_FetchNodesProgress,
     Ipc_ReceiveMessage
 };

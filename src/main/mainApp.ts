@@ -23,17 +23,13 @@ import {
     IoTCentralBaseDomain
 } from './models/iotCentral';
 import {
-    AdxDeploymentItem,
-    AdxConfigurationFileType,
+    SbDeploymentItem,
+    SbConfigurationFileType,
     emptySolution,
-    IAdxConfigurationItem,
-    IAdxSolution,
+    ISbConfigurationItem,
+    ISbSolution,
     AzureApiType
-} from './models/adxSolution';
-import {
-    IAdapterConfiguration,
-    emptyAdapterConfig
-} from './models/industrialConnect';
+} from './models/sbSolution';
 import {
     AzureDataExplorerApiScope,
     AzureManagementScope, IoTCentralApiScope
@@ -42,7 +38,6 @@ import {
     MsalAuthProvider
 } from './providers/auth/msalAuth';
 import { IoTCentralProvider } from './providers/iotCentral';
-import { IndustrialConnectProvider } from './providers/industrialConnect';
 import {
     requestApi,
     sleep
@@ -54,7 +49,7 @@ import {
 import { platform as osPlatform } from 'os';
 import axios from 'axios';
 import * as fse from 'fs-extra';
-import { intervalToDuration } from 'date-fns';
+import { differenceInSeconds } from 'date-fns';
 
 const ModuleName = 'MainApp';
 
@@ -62,11 +57,12 @@ const ModuleName = 'MainApp';
 declare const MAIN_WINDOW_WEBPACK_ENTRY: string;
 declare const MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY: string;
 
+const maxWaitForIotRuntimeStartup = (60 * 5);
+
 export class MainApp {
     private mainWindow: BrowserWindow = null;
     private authProvider: MsalAuthProvider = null;
     private iotCentralProvider: IoTCentralProvider;
-    private industrialConnectProvider: IndustrialConnectProvider;
     private mapApiTypeToApiScope: Map<string, string> = new Map<string, string>();
     private mapDeploymentStepProps: Map<string, any> = new Map<string, any>();
 
@@ -95,9 +91,6 @@ export class MainApp {
 
         this.iotCentralProvider = new IoTCentralProvider(ipcMain, this.mainWindow, this.authProvider);
         await this.iotCentralProvider.initialize();
-
-        this.industrialConnectProvider = new IndustrialConnectProvider(ipcMain, this.mainWindow, this.authProvider);
-        await this.industrialConnectProvider.initialize();
 
         this.mainWindow.once('ready-to-show', () => {
             this.mainWindow.show();
@@ -140,8 +133,6 @@ export class MainApp {
         ipcMain.handle(contextBridgeTypes.Ipc_SaveSolution, this.saveSolution.bind(this));
         ipcMain.handle(contextBridgeTypes.Ipc_StartProvisioning, this.startProvisioning.bind(this));
         ipcMain.handle(contextBridgeTypes.Ipc_ProvisioningState, this.provisioningState.bind(this));
-        ipcMain.handle(contextBridgeTypes.Ipc_GetAdapterConfiguration, this.getAdapterConfiguration.bind(this));
-        ipcMain.handle(contextBridgeTypes.Ipc_SetAdapterConfiguration, this.setAdapterConfiguration.bind(this));
         ipcMain.handle(contextBridgeTypes.Ipc_OpenLink, this.openLink.bind(this));
         ipcMain.handle(contextBridgeTypes.Ipc_RequestApi, this.internalApiRequest.bind(this));
     }
@@ -185,15 +176,15 @@ export class MainApp {
 
                 // Configuration files are just pure JSON files. Look for the magic
                 // GUID identifier to help ensure this is actually a compatible file.
-                if (!configurationResult?.fileType || configurationResult.fileType !== AdxConfigurationFileType) {
+                if (!configurationResult?.fileType || configurationResult.fileType !== SbConfigurationFileType) {
                     result.result = false;
-                    result.message = `Error: the selected file was either malformed or was not an ADX solution configuration file.`;
+                    result.message = `Error: the selected file was either malformed or was not an Solution Builder configuration file.`;
                     result.payload = emptySolution;
 
                     logger.log([ModuleName, 'error'], result.message);
                 }
                 else {
-                    const destinationCachePath = pathJoin(app.getPath('appData'), app.getName(), 'adxConfigurationCache');
+                    const destinationCachePath = pathJoin(app.getPath('appData'), app.getName(), 'sbConfigurationCache');
                     fse.ensureDirSync(destinationCachePath);
 
                     const destinationConfigFilePath = pathJoin(destinationCachePath, pathBasename(configFilePath));
@@ -217,7 +208,7 @@ export class MainApp {
         return result;
     }
 
-    private async saveSolution(_event: IpcMainInvokeEvent, adxSolution: IAdxSolution): Promise<IIpcResult> {
+    private async saveSolution(_event: IpcMainInvokeEvent, sbSolution: ISbSolution): Promise<IIpcResult> {
         logger.log([ModuleName, 'info'], `saveConfiguration`);
 
         const result: IIpcResult = {
@@ -229,7 +220,7 @@ export class MainApp {
             const configFilePath = store.get(StoreKeys.lastConfiguration);
 
             if (configFilePath) {
-                fse.writeJSONSync(configFilePath, adxSolution);
+                fse.writeJSONSync(configFilePath, sbSolution);
             }
         }
         catch (ex) {
@@ -242,10 +233,10 @@ export class MainApp {
         return result;
     }
 
-    private async startProvisioning(_event: IpcMainInvokeEvent, adxSolution: IAdxSolution): Promise<IIpcResult> {
+    private async startProvisioning(_event: IpcMainInvokeEvent, sbSolution: ISbSolution): Promise<IIpcResult> {
         logger.log([ModuleName, 'info'], `startProvisioning`);
 
-        void this.doProvisioning(adxSolution);
+        void this.doProvisioning(sbSolution);
 
         return {
             result: true,
@@ -259,7 +250,7 @@ export class MainApp {
         return store.get(StoreKeys.provisioningState) ? ProvisioningState.Active : ProvisioningState.Inactive;
     }
 
-    private async doProvisioning(adxSolution: IAdxSolution): Promise<void> {
+    private async doProvisioning(sbSolution: ISbSolution): Promise<void> {
         logger.log([ModuleName, 'info'], `Starting doProvisioning loop...`);
 
         let response: IServiceResponse = {
@@ -269,24 +260,19 @@ export class MainApp {
 
         store.set(StoreKeys.provisioningState, true);
 
-        this.mainWindow.webContents.send(contextBridgeTypes.Ipc_ProvisionProgress, {
-            label: 'Provisioning...',
-            value: 10,
-            total: 100
-        });
-        await sleep(1000);
-
         const subscriptionId = store.get(StoreKeys.subscriptionId);
 
         this.mapDeploymentStepProps.clear();
 
-        for (const configItem of adxSolution.configItems) {
+        for (const configItem of sbSolution.configItems) {
             try {
                 this.mainWindow.webContents.send(contextBridgeTypes.Ipc_StartProvisioningItem, configItem.id);
+                this.mainWindow.webContents.send(contextBridgeTypes.Ipc_ProvisionProgress, 'Provisioning...');
+                await sleep(1000);
 
                 logger.log([ModuleName, 'info'], `Processing step: ${configItem.name}, type: ${configItem.resourceApiType}`);
 
-                response = await this.executeDeploymentStep(configItem, adxSolution, subscriptionId);
+                response = await this.executeDeploymentStep(configItem, sbSolution, subscriptionId);
             }
             catch (ex) {
                 response.status = 500;
@@ -295,11 +281,7 @@ export class MainApp {
                 logger.log([ModuleName, 'error'], response.message);
             }
             finally {
-                this.mainWindow.webContents.send(contextBridgeTypes.Ipc_ProvisionProgress, {
-                    label: 'Provisioning step finished',
-                    value: 100,
-                    total: 100
-                });
+                this.mainWindow.webContents.send(contextBridgeTypes.Ipc_ProvisionProgress, 'Provisioning step finished');
                 await sleep(1000);
 
                 this.mainWindow.webContents.send(contextBridgeTypes.Ipc_EndProvisioning);
@@ -321,29 +303,13 @@ export class MainApp {
         logger.log([ModuleName, 'info'], `Leaving doProvisioning loop...`);
     }
 
-    private async getAdapterConfiguration(_event: IpcMainInvokeEvent, appId: string, deviceId: string): Promise<IAdapterConfiguration> {
-        logger.log([ModuleName, 'info'], `ipcMain ${contextBridgeTypes.Ipc_GetAdapterConfiguration} handler`);
-
-        return {
-            ...emptyAdapterConfig,
-            appId,
-            deviceId
-        };
-    }
-
-    private async setAdapterConfiguration(_event: IpcMainInvokeEvent, _adapterConfig: IAdapterConfiguration): Promise<boolean> {
-        logger.log([ModuleName, 'info'], `ipcMain ${contextBridgeTypes.Ipc_SetAdapterConfiguration} handler`);
-
-        return true;
-    }
-
     private async openLink(_event: IpcMainInvokeEvent, url: string): Promise<void> {
         logger.log([ModuleName, 'info'], `ipcMain ${contextBridgeTypes.Ipc_OpenLink} handler`);
 
         void shell.openExternal(url);
     }
 
-    private async executeDeploymentStep(configItem: IAdxConfigurationItem, adxSolution: IAdxSolution, subscriptionId: string): Promise<IServiceResponse> {
+    private async executeDeploymentStep(configItem: ISbConfigurationItem, sbSolution: ISbSolution, subscriptionId: string): Promise<IServiceResponse> {
         logger.log([ModuleName, 'info'], `executeDeploymentStep for config item type: ${configItem.itemType}`);
 
         let response: IServiceResponse = {
@@ -352,46 +318,46 @@ export class MainApp {
         };
 
         try {
-            const resourceName = `${configItem.resourceName}${adxSolution.resourceSuffixName}`;
+            const resourceName = `${configItem.resourceName}${sbSolution.resourceSuffixName}`;
             const apiConfig: any = {};
 
             switch (configItem.itemType) {
-                case AdxDeploymentItem.ResourceGroup: {
+                case SbDeploymentItem.ResourceGroup: {
                     apiConfig.method = 'put';
                     apiConfig.url = `https://management.azure.com/subscriptions/${subscriptionId}/resourcegroups/${resourceName}?api-version=2021-04-01`;
                     apiConfig.data = {
                         ...configItem.payload,
                         tags: {
                             ...(configItem.payload?.tags || {}),
-                            adxsbid: adxSolution.id
+                            iotcsbid: sbSolution.id
                         }
                     };
 
                     break;
                 }
 
-                case AdxDeploymentItem.IotcCreateApp: {
-                    const resourceGroupName = this.mapDeploymentStepProps.get(AdxDeploymentItem.ResourceGroup).name;
+                case SbDeploymentItem.IotcCreateApp: {
+                    const resourceGroupName = this.mapDeploymentStepProps.get(SbDeploymentItem.ResourceGroup).name;
 
                     apiConfig.method = 'put';
                     apiConfig.url = `https://management.azure.com/subscriptions/${subscriptionId}/resourceGroups/${resourceGroupName}/providers/Microsoft.IoTCentral/iotApps/${resourceName}?api-version=2021-06-01`;
                     apiConfig.data = {
                         ...configItem.payload,
                         properties: {
-                            displayName: `${configItem.payload.properties.displayName}${adxSolution.resourceSuffixName}`,
-                            subdomain: `${configItem.payload.properties.subdomain}${adxSolution.resourceSuffixName}`
+                            displayName: `${configItem.payload.properties.displayName}${sbSolution.resourceSuffixName}`,
+                            subdomain: `${configItem.payload.properties.subdomain}${sbSolution.resourceSuffixName}`
                         },
                         tags: {
                             ...(configItem.payload?.tags || {}),
-                            adxsbid: adxSolution.id
+                            iotcsbid: sbSolution.id
                         }
                     };
 
                     break;
                 }
 
-                case AdxDeploymentItem.IotcImportEdgeCapabilityModel: {
-                    const subdomain = this.mapDeploymentStepProps.get(AdxDeploymentItem.IotcCreateApp).properties.subdomain;
+                case SbDeploymentItem.IotcImportEdgeCapabilityModel: {
+                    const subdomain = this.mapDeploymentStepProps.get(SbDeploymentItem.IotcCreateApp).properties.subdomain;
 
                     apiConfig.method = 'put';
                     apiConfig.url = `https://${subdomain}.${IoTCentralBaseDomain}/api/deviceTemplates/${configItem.payload.templateId}?api-version=1.1-preview`;
@@ -400,8 +366,8 @@ export class MainApp {
                     break;
                 }
 
-                case AdxDeploymentItem.IotcRegisterEdgeDevice: {
-                    const subdomain = this.mapDeploymentStepProps.get(AdxDeploymentItem.IotcCreateApp).properties.subdomain;
+                case SbDeploymentItem.IotcRegisterEdgeDevice: {
+                    const subdomain = this.mapDeploymentStepProps.get(SbDeploymentItem.IotcCreateApp).properties.subdomain;
 
                     apiConfig.method = 'put';
                     apiConfig.url = `https://${subdomain}.${IoTCentralBaseDomain}/api/devices/${configItem.payload.deviceId}?api-version=1.1-preview`;
@@ -410,27 +376,27 @@ export class MainApp {
                     break;
                 }
 
-                case AdxDeploymentItem.IotcGetEdgeDeviceAttestation: {
+                case SbDeploymentItem.IotcGetEdgeDeviceAttestation: {
                     apiConfig.method = 'get';
-                    const subdomain = this.mapDeploymentStepProps.get(AdxDeploymentItem.IotcCreateApp).properties.subdomain;
-                    const deviceId = this.mapDeploymentStepProps.get(AdxDeploymentItem.IotcRegisterEdgeDevice).id;
+                    const subdomain = this.mapDeploymentStepProps.get(SbDeploymentItem.IotcCreateApp).properties.subdomain;
+                    const deviceId = this.mapDeploymentStepProps.get(SbDeploymentItem.IotcRegisterEdgeDevice).id;
 
                     apiConfig.url = `https://${subdomain}.${IoTCentralBaseDomain}/api/devices/${deviceId}/credentials?api-version=1.1-preview`;
 
                     break;
                 }
 
-                case AdxDeploymentItem.VirtualMachine: {
-                    const resourceGroupName = this.mapDeploymentStepProps.get(AdxDeploymentItem.ResourceGroup).name;
+                case SbDeploymentItem.VirtualMachine: {
+                    const resourceGroupName = this.mapDeploymentStepProps.get(SbDeploymentItem.ResourceGroup).name;
 
                     const templateParameters = configItem.payload.properties.template.parameters;
-                    templateParameters.dnsLabelPrefix.defaultValue = adxSolution.resourceSuffixName;
-                    templateParameters.adminUsername.defaultValue = `${adxSolution.resourceSuffixName}_admin`;
+                    templateParameters.dnsLabelPrefix.defaultValue = sbSolution.resourceSuffixName;
+                    templateParameters.adminUsername.defaultValue = `${sbSolution.resourceSuffixName}_admin`;
 
-                    const deviceAttestation = this.mapDeploymentStepProps.get(AdxDeploymentItem.IotcGetEdgeDeviceAttestation);
+                    const deviceAttestation = this.mapDeploymentStepProps.get(SbDeploymentItem.IotcGetEdgeDeviceAttestation);
 
                     templateParameters.scopeId.defaultValue = deviceAttestation.idScope;
-                    templateParameters.deviceId.defaultValue = this.mapDeploymentStepProps.get(AdxDeploymentItem.IotcRegisterEdgeDevice).id;
+                    templateParameters.deviceId.defaultValue = this.mapDeploymentStepProps.get(SbDeploymentItem.IotcRegisterEdgeDevice).id;
                     templateParameters.symmetricKey.defaultValue = deviceAttestation.symmetricKey.primaryKey;
 
                     apiConfig.method = 'put';
@@ -439,15 +405,15 @@ export class MainApp {
                         ...configItem.payload,
                         tags: {
                             ...(configItem.payload?.tags || {}),
-                            adxsbid: adxSolution.id
+                            iotcsbid: sbSolution.id
                         }
                     };
 
                     break;
                 }
 
-                case AdxDeploymentItem.IotcRegisterIiotDevice: {
-                    const subdomain = this.mapDeploymentStepProps.get(AdxDeploymentItem.IotcCreateApp).properties.subdomain;
+                case SbDeploymentItem.IotcRegisterIiotDevice: {
+                    const subdomain = this.mapDeploymentStepProps.get(SbDeploymentItem.IotcCreateApp).properties.subdomain;
 
                     apiConfig.method = 'put';
                     apiConfig.url = `https://${subdomain}.${IoTCentralBaseDomain}/api/devices/${configItem.payload.deviceId}?api-version=1.1-preview`;
@@ -456,9 +422,9 @@ export class MainApp {
                     break;
                 }
 
-                case AdxDeploymentItem.IotcGetIiotDeviceAttestation: {
-                    const subdomain = this.mapDeploymentStepProps.get(AdxDeploymentItem.IotcCreateApp).properties.subdomain;
-                    const deviceId = this.mapDeploymentStepProps.get(AdxDeploymentItem.IotcRegisterIiotDevice).id;
+                case SbDeploymentItem.IotcGetIiotDeviceAttestation: {
+                    const subdomain = this.mapDeploymentStepProps.get(SbDeploymentItem.IotcCreateApp).properties.subdomain;
+                    const deviceId = this.mapDeploymentStepProps.get(SbDeploymentItem.IotcRegisterIiotDevice).id;
 
                     apiConfig.method = 'get';
                     apiConfig.url = `https://${subdomain}.${IoTCentralBaseDomain}/api/devices/${deviceId}/credentials?api-version=1.1-preview`;
@@ -466,10 +432,10 @@ export class MainApp {
                     break;
                 }
 
-                case AdxDeploymentItem.IotEdgeRuntimeStartup: {
-                    const subdomain = this.mapDeploymentStepProps.get(AdxDeploymentItem.IotcCreateApp).properties.subdomain;
-                    const moduleId = this.mapDeploymentStepProps.get(AdxDeploymentItem.IotcRegisterEdgeDevice).id;
-                    const opcEndpoint = `${subdomain}.westus2.cloudapp.azure.com`; // this.mapDeploymentStepProps.get(AdxDeploymentItem.VirtualMachine);
+                case SbDeploymentItem.IotEdgeRuntimeStartup: {
+                    const subdomain = this.mapDeploymentStepProps.get(SbDeploymentItem.IotcCreateApp).properties.subdomain;
+                    const moduleId = this.mapDeploymentStepProps.get(SbDeploymentItem.IotcRegisterEdgeDevice).id;
+                    const opcEndpoint = `${subdomain}.westus2.cloudapp.azure.com`; // this.mapDeploymentStepProps.get(SbDeploymentItem.VirtualMachine);
                     const opcEndpointParameter = configItem.payload.testConnectionRequest.opcEndpoint;
                     opcEndpointParameter.uri = `opc.tcp://${opcEndpoint}:50000`;
 
@@ -491,21 +457,14 @@ export class MainApp {
                             break;
                         }
 
-                        const waitSeconds = intervalToDuration({
-                            start: startTime,
-                            end: Date.now()
-                        }).seconds;
+                        const waitSeconds = differenceInSeconds(Date.now(), startTime);
 
                         logger.log([ModuleName, 'info'], `Waiting for IoT Edge runtime startup - elapsed ${waitSeconds} sec....`);
 
-                        this.mainWindow.webContents.send(contextBridgeTypes.Ipc_ProvisionProgress, {
-                            label: 'Provisioning...',
-                            value: Math.floor((waitSeconds * 100) / (60 * 5)),
-                            total: 100
-                        });
+                        this.mainWindow.webContents.send(contextBridgeTypes.Ipc_ProvisionProgress, `Provisioning (est. ${Math.floor((waitSeconds * 100) / maxWaitForIotRuntimeStartup)}%)...`);
 
                         // wait for Azure IoT Edge runtime to startup and provision the manifest (5min. max)
-                        if (waitSeconds > (60 * 5)) {
+                        if (waitSeconds > maxWaitForIotRuntimeStartup) {
                             response.status = 500;
                             response.message = 'The Azure IoT runtime is taking longer than expected. You can try to provision the remaining steps manually. See the README for help with this.';
 
@@ -517,17 +476,17 @@ export class MainApp {
                     break;
                 }
 
-                case AdxDeploymentItem.IotcProvisionIiotDevice: {
-                    const subdomain = this.mapDeploymentStepProps.get(AdxDeploymentItem.IotcCreateApp).properties.subdomain;
-                    const edgeDeviceId = this.mapDeploymentStepProps.get(AdxDeploymentItem.IotcRegisterEdgeDevice).id;
+                case SbDeploymentItem.IotcProvisionIiotDevice: {
+                    const subdomain = this.mapDeploymentStepProps.get(SbDeploymentItem.IotcCreateApp).properties.subdomain;
+                    const edgeDeviceId = this.mapDeploymentStepProps.get(SbDeploymentItem.IotcRegisterEdgeDevice).id;
 
-                    const iiotDeviceAttestation = this.mapDeploymentStepProps.get(AdxDeploymentItem.IotcGetIiotDeviceAttestation);
+                    const iiotDeviceAttestation = this.mapDeploymentStepProps.get(SbDeploymentItem.IotcGetIiotDeviceAttestation);
                     const deviceCredentialParameters = configItem.payload.addOrUpdateAssetRequest.asset.deviceCredentials;
                     deviceCredentialParameters.idScope = iiotDeviceAttestation.idScope;
                     deviceCredentialParameters.primaryKey = iiotDeviceAttestation.symmetricKey.primaryKey;
                     deviceCredentialParameters.secondaryKey = iiotDeviceAttestation.symmetricKey.secondaryKey;
 
-                    const opcEndpoint = `${subdomain}.westus2.cloudapp.azure.com`; // this.mapDeploymentStepProps.get(AdxDeploymentItem.VirtualMachine);
+                    const opcEndpoint = `${subdomain}.westus2.cloudapp.azure.com`; // this.mapDeploymentStepProps.get(SbDeploymentItem.VirtualMachine);
                     const opcEndpointParameter = configItem.payload.addOrUpdateAssetRequest.asset.opcEndpoint;
                     opcEndpointParameter.uri = `opc.tcp://${opcEndpoint}:50000`;
 
@@ -545,8 +504,8 @@ export class MainApp {
                     break;
                 }
 
-                case AdxDeploymentItem.AdxCreateCluster: {
-                    const resourceGroupName = this.mapDeploymentStepProps.get(AdxDeploymentItem.ResourceGroup).name;
+                case SbDeploymentItem.AdxCreateCluster: {
+                    const resourceGroupName = this.mapDeploymentStepProps.get(SbDeploymentItem.ResourceGroup).name;
 
                     apiConfig.method = 'put';
                     apiConfig.url = `https://management.azure.com/subscriptions/${subscriptionId}/resourceGroups/${resourceGroupName}/providers/Microsoft.Kusto/clusters/${resourceName}?api-version=2022-02-01`;
@@ -554,15 +513,20 @@ export class MainApp {
                         ...configItem.payload,
                         tags: {
                             ...(configItem.payload?.tags || {}),
-                            adxsbid: adxSolution.id
+                            iotcsbid: sbSolution.id
                         }
                     };
 
                     break;
                 }
 
-                case AdxDeploymentItem.IotcConfigureCdeDestination: {
-                    // const subdomain = this.mapDeploymentStepProps.get(AdxDeploymentItem.IotcCreateApp).properties.subdomain;
+                case SbDeploymentItem.AdxCreateDatabaseTable:
+                    // ClientRequestProperities options:
+                    // https://github.com/MicrosoftDocs/dataexplorer-docs/blob/main/data-explorer/kusto/api/netfx/request-properties.md
+                    break;
+
+                case SbDeploymentItem.IotcConfigureCdeDestination: {
+                    // const subdomain = this.mapDeploymentStepProps.get(SbDeploymentItem.IotcCreateApp).properties.subdomain;
 
                     // apiConfig.method = 'put';
                     // apiConfig.url = `https://${subdomain}.${IoTCentralBaseDomain}/api/dataExport/destinations/${configItem.payload.destinationId}?api-version=1.1-preview`;
@@ -571,8 +535,8 @@ export class MainApp {
                     break;
                 }
 
-                case AdxDeploymentItem.IotcConfigureCdeExport: {
-                    // const subdomain = this.mapDeploymentStepProps.get(AdxDeploymentItem.IotcCreateApp).properties.subdomain;
+                case SbDeploymentItem.IotcConfigureCdeExport: {
+                    // const subdomain = this.mapDeploymentStepProps.get(SbDeploymentItem.IotcCreateApp).properties.subdomain;
 
                     // apiConfig.method = 'put';
                     // apiConfig.url = `https://${subdomain}.${IoTCentralBaseDomain}/api/dataExport/export/${configItem.payload.exportId}?api-version=1.1-preview`;
@@ -581,7 +545,7 @@ export class MainApp {
                     break;
                 }
 
-                case AdxDeploymentItem.AdxConfigureDataImport:
+                case SbDeploymentItem.AdxConfigureDataImport:
                     // case: configure adx to import dashboards, etc.
 
                     break;
@@ -593,12 +557,16 @@ export class MainApp {
                     logger.log([ModuleName, 'error'], response.message);
             }
 
-            if (serviceResponseSucceeded(response) && configItem.itemType !== AdxDeploymentItem.IotEdgeRuntimeStartup) {
+            if (serviceResponseSucceeded(response) && configItem.itemType !== SbDeploymentItem.IotEdgeRuntimeStartup) {
                 response = await this.executeApi(apiConfig, configItem);
 
                 this.mapDeploymentStepProps.set(configItem.itemType, response.payload);
 
                 this.mainWindow.webContents.send(contextBridgeTypes.Ipc_SaveProvisioningResponse, configItem.id, response.payload);
+
+                if (configItem?.pauseStep) {
+                    await sleep(configItem?.pauseStep || 0);
+                }
             }
         }
         catch (ex) {
@@ -608,7 +576,7 @@ export class MainApp {
         return response;
     }
 
-    private async executeApi(apiConfig: any, configItem: IAdxConfigurationItem): Promise<IServiceResponse> {
+    private async executeApi(apiConfig: any, configItem: ISbConfigurationItem): Promise<IServiceResponse> {
         let response: IServiceResponse = {
             status: 200,
             message: ''
@@ -695,13 +663,7 @@ export class MainApp {
                     break;
                 }
 
-                const value = response.payload?.percentComplete || 0.5;
-
-                this.mainWindow.webContents.send(contextBridgeTypes.Ipc_ProvisionProgress, {
-                    label: response.payload.status || 'Provisioning...',
-                    value: value >= 1 ? value : value * 100,
-                    total: 100
-                });
+                this.mainWindow.webContents.send(contextBridgeTypes.Ipc_ProvisionProgress, response.payload.status || 'Provisioning...');
 
                 await sleep(1000 * retryAfter);
             } while (response.status === 200 || response.status === 202);

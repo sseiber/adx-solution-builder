@@ -50,17 +50,17 @@ export default class MenuBuilder {
 
     private buildDarwinTemplate(): MenuItemConstructorOptions[] {
         const subMenuAbout: DarwinMenuItemConstructorOptions = {
-            label: 'ADX Solution Builder',
+            label: 'IoT Central Solution Builder',
             submenu: [
                 {
-                    label: 'About ADX Solution Builder',
+                    label: 'About IoT Central Solution Builder',
                     selector: 'orderFrontStandardAboutPanel:'
                 },
                 { type: 'separator' },
                 { label: 'Services', submenu: [] },
                 { type: 'separator' },
                 {
-                    label: 'Hide ADX Solution Builder',
+                    label: 'Hide IoT Central Solution Builder',
                     accelerator: 'Command+H',
                     selector: 'hide:'
                 },

@@ -99,7 +99,7 @@ const AzureConfigPage: FC = observer(() => {
     };
 
     const onCancel = () => {
-        navigate(AppNavigationPaths.ADXConfig);
+        navigate(AppNavigationPaths.SbConfig);
     };
 
     return (

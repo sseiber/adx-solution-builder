@@ -39,7 +39,7 @@ const HomePage: FC = observer(() => {
                 <Grid.Column>
                     <Message size='large'>
                         <Message.Header>Azure</Message.Header>
-                        <p>ADX Solution Builder</p>
+                        <p>IoT Central Solution Builder</p>
                     </Message>
                     {
                         sessionStore.authenticationState !== AuthenticationState.Authenticated

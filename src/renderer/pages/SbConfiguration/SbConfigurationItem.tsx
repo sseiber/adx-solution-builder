@@ -1,31 +1,27 @@
 import React, { ReactElement, FC } from 'react';
-import { Image, Message, Item, Grid, Divider, Label, Segment, Progress } from 'semantic-ui-react';
+import { Image, Message, Item, Grid, Divider, Label, Loader, Dimmer } from 'semantic-ui-react';
 import { IoTCentralBaseDomain } from '../../../main/models/iotCentral';
 import {
-    AdxDeploymentItem,
-    IAdxConfigurationItem
-} from '../../../main/models/adxSolution';
+    SbDeploymentItem,
+    ISbConfigurationItem
+} from '../../../main/models/sbSolution';
 
-interface IADXConfigurationItemProps {
+interface ISbConfigurationItemProps {
     key: string;
     openLink: (url: string) => Promise<void>;
-    item: IAdxConfigurationItem;
+    item: ISbConfigurationItem;
     resourceSuffix: string;
     resourceImageSrc: string;
     deployingItemId: string;
-    progressTotal: number;
-    progressValue: number;
     progressLabel: string;
 }
-const ADXConfigurationItem: FC<IADXConfigurationItemProps> = (props: IADXConfigurationItemProps) => {
+const SbConfigurationItem: FC<ISbConfigurationItemProps> = (props: ISbConfigurationItemProps) => {
     const {
         openLink,
         item,
         resourceSuffix,
         resourceImageSrc,
         deployingItemId,
-        progressTotal,
-        progressValue,
         progressLabel
     } = props;
 
@@ -39,12 +35,12 @@ const ADXConfigurationItem: FC<IADXConfigurationItemProps> = (props: IADXConfigu
                 }
                 <Label>{`${item.resourceName}${resourceSuffix}`}</Label>
                 {
-                    (item.itemType === AdxDeploymentItem.IotcRegisterEdgeDevice)
+                    (item.itemType === SbDeploymentItem.IotcRegisterEdgeDevice)
                         ? <Label as='a' onClick={() => openLink(`https://${resourceSuffix}.${IoTCentralBaseDomain}/devices/details/industrial-connect-gw/commands`)}>{item.payload.deviceId}</Label>
                         : null
                 }
                 {
-                    (item.itemType === AdxDeploymentItem.IotcCreateApp)
+                    (item.itemType === SbDeploymentItem.IotcCreateApp)
                         ? (
                             <>
                                 <Label as='a' onClick={() => openLink(`https://${resourceSuffix}.${IoTCentralBaseDomain}`)}>{`https://${resourceSuffix}.${IoTCentralBaseDomain}`}</Label>
@@ -54,25 +50,25 @@ const ADXConfigurationItem: FC<IADXConfigurationItemProps> = (props: IADXConfigu
                         : null
                 }
                 {
-                    (item.itemType === AdxDeploymentItem.IotcImportEdgeCapabilityModel)
+                    (item.itemType === SbDeploymentItem.IotcImportEdgeCapabilityModel)
                         // eslint-disable-next-line max-len
                         ? <Label as='a' onClick={() => openLink(`https://docs.microsoft.com/en-us/rest/api/iotcentral/1.1-previewdataplane/device-templates/create`)}>doc</Label>
                         : null
                 }
                 {
-                    (item.itemType === AdxDeploymentItem.IotcRegisterEdgeDevice)
+                    (item.itemType === SbDeploymentItem.IotcRegisterEdgeDevice)
                         // eslint-disable-next-line max-len
                         ? <Label as='a' onClick={() => openLink(`https://docs.microsoft.com/en-us/rest/api/iotcentral/1.1-previewdataplane/devices/create`)}>doc</Label>
                         : null
                 }
                 {
-                    (item.itemType === AdxDeploymentItem.IotcGetEdgeDeviceAttestation)
+                    (item.itemType === SbDeploymentItem.IotcGetEdgeDeviceAttestation)
                         // eslint-disable-next-line max-len
                         ? <Label as='a' onClick={() => openLink(`https://docs.microsoft.com/en-us/rest/api/iotcentral/1.1-previewdataplane/devices/get-attestation`)}>doc</Label>
                         : null
                 }
                 {
-                    (item.itemType === AdxDeploymentItem.IotcProvisionIiotDevice)
+                    (item.itemType === SbDeploymentItem.IotcProvisionIiotDevice)
                         // eslint-disable-next-line max-len
                         ? <Label as='a' onClick={() => openLink(`https://${resourceSuffix}.${IoTCentralBaseDomain}/devices/details/opc-anomaly-device/rawdata`)}>{item.payload.addOrUpdateAssetRequest.asset.assetId}</Label>
                         : null
@@ -98,26 +94,6 @@ const ADXConfigurationItem: FC<IADXConfigurationItemProps> = (props: IADXConfigu
                                     <Item.Meta>{item.description}</Item.Meta>
                                 </div>
                             </Grid.Column>
-                            <Grid.Column width='6'>
-                                {
-                                    deployingItemId === item.id
-                                        ? (
-                                            <Segment style={{ width: '100%' }} floated='right' textAlign='center' secondary>
-                                                <Progress
-                                                    color='blue'
-                                                    size='small'
-                                                    // percent={progressValue}
-                                                    progress='percent'
-                                                    total={progressTotal}
-                                                    value={progressValue}
-                                                    active
-                                                    content={progressLabel}
-                                                />
-                                            </Segment>
-                                        )
-                                        : null
-                                }
-                            </Grid.Column>
                         </Grid.Row>
                     </Grid>
                 </Item.Content>
@@ -127,9 +103,12 @@ const ADXConfigurationItem: FC<IADXConfigurationItemProps> = (props: IADXConfigu
                         getLabels()
                     }
                 </Item.Extra>
+                <Dimmer style={{ border: '1px solid black', borderColor: '#cececf', borderRadius: '3px' }} active={deployingItemId === item.id} inverted>
+                    <Loader>{progressLabel}</Loader>
+                </Dimmer>
             </Item>
         </Message >
     );
 };
 
-export default ADXConfigurationItem;
+export default SbConfigurationItem;

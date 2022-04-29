@@ -1,22 +1,20 @@
 import React, { FC } from 'react';
 import { Grid, Segment, Header, Message, Item } from 'semantic-ui-react';
-import { IAdxConfigurationItem } from '../../../main/models/adxSolution';
-import ADXConfigurationItem from './ADXConfigurationItem';
+import { ISbConfigurationItem } from '../../../main/models/sbSolution';
+import SbConfigurationItem from './SbConfigurationItem';
 
-interface IADXConfigurationPanelProps {
+interface ISbConfigurationPanelProps {
     openLink: (url: string) => Promise<void>;
     userDisplayName: string;
     confgurationName: string;
     resourceSuffix: string;
     mapItemTypeToImageName: Map<string, string>;
-    configItems: IAdxConfigurationItem[];
+    configItems: ISbConfigurationItem[];
     deployingItemId: string;
-    progressTotal: number;
-    progressValue: number;
     progressLabel: string;
 }
 
-const ADXConfigurationPanel: FC<IADXConfigurationPanelProps> = (props: IADXConfigurationPanelProps) => {
+const SbConfigurationPanel: FC<ISbConfigurationPanelProps> = (props: ISbConfigurationPanelProps) => {
     const {
         openLink,
         confgurationName,
@@ -24,8 +22,6 @@ const ADXConfigurationPanel: FC<IADXConfigurationPanelProps> = (props: IADXConfi
         mapItemTypeToImageName,
         configItems,
         deployingItemId,
-        progressTotal,
-        progressValue,
         progressLabel
     } = props;
 
@@ -48,15 +44,13 @@ const ADXConfigurationPanel: FC<IADXConfigurationPanelProps> = (props: IADXConfi
                                         {
                                             configItems.map((item) => {
                                                 return (
-                                                    <ADXConfigurationItem
+                                                    <SbConfigurationItem
                                                         key={item.id}
                                                         openLink={openLink}
                                                         item={item}
                                                         resourceSuffix={resourceSuffix}
                                                         resourceImageSrc={mapItemTypeToImageName.get(item.itemType)}
                                                         deployingItemId={deployingItemId}
-                                                        progressTotal={progressTotal}
-                                                        progressValue={progressValue}
                                                         progressLabel={progressLabel}
                                                     />
                                                 );
@@ -66,7 +60,7 @@ const ADXConfigurationPanel: FC<IADXConfigurationPanelProps> = (props: IADXConfi
                                 )
                                 : (
                                     <Message warning>
-                                        <Message.Header>There are no ADX solution items</Message.Header>
+                                        <Message.Header>There are no Solution Builder items</Message.Header>
                                     </Message>
                                 )
                         }
@@ -77,4 +71,4 @@ const ADXConfigurationPanel: FC<IADXConfigurationPanelProps> = (props: IADXConfi
     );
 };
 
-export default ADXConfigurationPanel;
+export default SbConfigurationPanel;

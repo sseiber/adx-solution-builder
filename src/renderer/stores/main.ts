@@ -4,16 +4,14 @@ import * as contextBridgeTypes from '../../main/contextBridgeTypes';
 import {
     IIpcResult,
     ProvisioningState,
-    IIpcProgress,
-    emptyProgress,
     IServiceError,
     emptyServiceError
 } from '../../main/models/main';
 import {
-    AdxDeploymentItem,
-    IAdxSolution,
+    SbDeploymentItem,
+    ISbSolution,
     emptySolution
-} from '../../main/models/adxSolution';
+} from '../../main/models/sbSolution';
 
 export enum AuthenticationState {
     Authenticated = 'Authenticated',
@@ -27,20 +25,20 @@ export class MainStore {
         makeAutoObservable(this);
 
         this.mapItemTypeToImageName = new Map<string, string>();
-        this.mapItemTypeToImageName.set(AdxDeploymentItem.ResourceGroup, 'resourcegroup.png');
-        this.mapItemTypeToImageName.set(AdxDeploymentItem.IotcCreateApp, 'iotcentral.png');
-        this.mapItemTypeToImageName.set(AdxDeploymentItem.IotcImportEdgeCapabilityModel, 'iotcentral.png');
-        this.mapItemTypeToImageName.set(AdxDeploymentItem.IotcRegisterEdgeDevice, 'iotcentral.png');
-        this.mapItemTypeToImageName.set(AdxDeploymentItem.IotcGetEdgeDeviceAttestation, 'iotcentral.png');
-        this.mapItemTypeToImageName.set(AdxDeploymentItem.VirtualMachine, 'vm.png');
-        this.mapItemTypeToImageName.set(AdxDeploymentItem.IotcRegisterIiotDevice, 'iotcentral.png');
-        this.mapItemTypeToImageName.set(AdxDeploymentItem.IotcGetIiotDeviceAttestation, 'iotcentral.png');
-        this.mapItemTypeToImageName.set(AdxDeploymentItem.IotEdgeRuntimeStartup, 'iotedge.png');
-        this.mapItemTypeToImageName.set(AdxDeploymentItem.IotcProvisionIiotDevice, 'iotcentral.png');
-        this.mapItemTypeToImageName.set(AdxDeploymentItem.AdxCreateCluster, 'adx.png');
-        this.mapItemTypeToImageName.set(AdxDeploymentItem.IotcConfigureCdeDestination, 'iotcentral.png');
-        this.mapItemTypeToImageName.set(AdxDeploymentItem.IotcConfigureCdeExport, 'iotcentral.png');
-        this.mapItemTypeToImageName.set(AdxDeploymentItem.AdxConfigureDataImport, 'adx.png');
+        this.mapItemTypeToImageName.set(SbDeploymentItem.ResourceGroup, 'resourcegroup.png');
+        this.mapItemTypeToImageName.set(SbDeploymentItem.IotcCreateApp, 'iotcentral.png');
+        this.mapItemTypeToImageName.set(SbDeploymentItem.IotcImportEdgeCapabilityModel, 'iotcentral.png');
+        this.mapItemTypeToImageName.set(SbDeploymentItem.IotcRegisterEdgeDevice, 'iotcentral.png');
+        this.mapItemTypeToImageName.set(SbDeploymentItem.IotcGetEdgeDeviceAttestation, 'iotcentral.png');
+        this.mapItemTypeToImageName.set(SbDeploymentItem.VirtualMachine, 'vm.png');
+        this.mapItemTypeToImageName.set(SbDeploymentItem.IotcRegisterIiotDevice, 'iotcentral.png');
+        this.mapItemTypeToImageName.set(SbDeploymentItem.IotcGetIiotDeviceAttestation, 'iotcentral.png');
+        this.mapItemTypeToImageName.set(SbDeploymentItem.IotEdgeRuntimeStartup, 'iotedge.png');
+        this.mapItemTypeToImageName.set(SbDeploymentItem.IotcProvisionIiotDevice, 'iotcentral.png');
+        this.mapItemTypeToImageName.set(SbDeploymentItem.AdxCreateCluster, 'adx.png');
+        this.mapItemTypeToImageName.set(SbDeploymentItem.IotcConfigureCdeDestination, 'iotcentral.png');
+        this.mapItemTypeToImageName.set(SbDeploymentItem.IotcConfigureCdeExport, 'iotcentral.png');
+        this.mapItemTypeToImageName.set(SbDeploymentItem.AdxConfigureDataImport, 'adx.png');
 
         window.ipcApi[contextBridgeTypes.Ipc_ProvisionProgress](contextBridgeTypes.Ipc_ProvisionProgress, this.onProvisionProgress.bind(this));
         window.ipcApi[contextBridgeTypes.Ipc_StartProvisioningItem](contextBridgeTypes.Ipc_StartProvisioningItem, this.onStartProvisioningItem.bind(this));
@@ -49,12 +47,12 @@ export class MainStore {
         window.ipcApi[contextBridgeTypes.Ipc_ServiceError](contextBridgeTypes.Ipc_ServiceError, this.onServiceError.bind(this));
     }
 
-    public adxSolution: IAdxSolution = emptySolution;
+    public sbSolution: ISbSolution = emptySolution;
     public serviceError: IServiceError = emptyServiceError;
     public mapItemTypeToImageName: Map<string, string>;
     public provisioningState = ProvisioningState.Inactive;
     public deployingItemId = '';
-    public provisionProgress = emptyProgress;
+    public provisionProgressLabel = '';
 
     public get isProduction(): boolean {
         return process.env.NODE_ENV === 'production';
@@ -76,7 +74,7 @@ export class MainStore {
         const response = await window.ipcApi[contextBridgeTypes.Ipc_OpenSolution](loadLastSolution);
         if (response && response.result && response.payload) {
             runInAction(() => {
-                this.adxSolution = response.payload;
+                this.sbSolution = response.payload;
             });
         }
 
@@ -91,7 +89,7 @@ export class MainStore {
             this.provisioningState = ProvisioningState.Active;
         });
 
-        const response = await window.ipcApi[contextBridgeTypes.Ipc_StartProvisioning](toJS(this.adxSolution));
+        const response = await window.ipcApi[contextBridgeTypes.Ipc_StartProvisioning](toJS(this.sbSolution));
 
         return response || {
             result: false,
@@ -110,24 +108,24 @@ export class MainStore {
     private onStartProvisioningItem(_event: IpcRendererEvent, itemId: string): void {
         runInAction(() => {
             this.deployingItemId = itemId;
-            this.provisionProgress = emptyProgress;
+            this.provisionProgressLabel = '';
         });
     }
 
     private onSaveProvisioningResponse(_event: IpcRendererEvent, itemId: string, response: any): void {
         runInAction(() => {
-            const configItem = this.adxSolution.configItems.find(item => item.id === itemId);
+            const configItem = this.sbSolution.configItems.find(item => item.id === itemId);
             if (configItem) {
                 configItem.provisionResponse = response;
             }
         });
 
-        void window.ipcApi[contextBridgeTypes.Ipc_SaveSolution](toJS(this.adxSolution));
+        void window.ipcApi[contextBridgeTypes.Ipc_SaveSolution](toJS(this.sbSolution));
     }
 
-    private onProvisionProgress(_event: IpcRendererEvent, message: IIpcProgress): void {
+    private onProvisionProgress(_event: IpcRendererEvent, message: string): void {
         runInAction(() => {
-            this.provisionProgress = message;
+            this.provisionProgressLabel = message;
         });
     }
 
@@ -135,7 +133,7 @@ export class MainStore {
         runInAction(() => {
             this.provisioningState = ProvisioningState.Inactive;
             this.deployingItemId = '';
-            this.provisionProgress = emptyProgress;
+            this.provisionProgressLabel = '';
         });
     }
 

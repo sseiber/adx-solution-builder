@@ -1,3 +1,6 @@
+* when a provision is started as for or create the necessary security details
+   * container registry credentials
+   * ssh private key (supply the public key for the user)
 * when you open the app - re-verify the resources if they are marked as provisioned
 * when you create a resource and it's already there, don't fail
    - this is either "search for the resource before provisioning"

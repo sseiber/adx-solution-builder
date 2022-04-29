@@ -2,20 +2,17 @@ import { createContext, useContext } from 'react';
 import { MainStore } from './main';
 import { SessionStore } from './session';
 import { IotCentralStore } from './iotCentral';
-import { IndustrialConnectStore } from './industrialConnect';
 
 export interface IStore {
     mainStore: MainStore;
     sessionStore: SessionStore;
     iotCentralStore: IotCentralStore;
-    industrialConnectStore: IndustrialConnectStore;
 }
 
 export const store: IStore = {
     mainStore: new MainStore(),
     sessionStore: new SessionStore(),
-    iotCentralStore: new IotCentralStore(),
-    industrialConnectStore: new IndustrialConnectStore()
+    iotCentralStore: new IotCentralStore()
 };
 
 export const StoreContext = createContext(store);

@@ -9,18 +9,6 @@ export enum ProvisioningState {
     Inactive
 }
 
-export interface IIpcProgress {
-    label: string;
-    value: number;
-    total: number;
-}
-
-export const emptyProgress: IIpcProgress = {
-    label: '',
-    value: 0,
-    total: 100
-};
-
 export interface IServiceResponse {
     status: number;
     message: string;

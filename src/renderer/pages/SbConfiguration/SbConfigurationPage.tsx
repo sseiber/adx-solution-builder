@@ -4,9 +4,9 @@ import { useAsyncEffect } from 'use-async-effect';
 import { Grid } from 'semantic-ui-react';
 import { useStore } from '../../stores/store';
 import { useInfoDialog, showInfoDialog } from '../../components/InfoDialogContext';
-import IotCentralPanel from './ADXConfigurationPanel';
+import SbConfigurationPanel from './SbConfigurationPanel';
 
-const ADXConfigurationPage: FC = observer(() => {
+const SbConfigurationPage: FC = observer(() => {
     const infoDialogContext = useInfoDialog();
     const {
         mainStore,
@@ -38,17 +38,15 @@ const ADXConfigurationPage: FC = observer(() => {
             <Grid style={{ padding: '5em 5em' }}>
                 <Grid.Row>
                     <Grid.Column>
-                        <IotCentralPanel
+                        <SbConfigurationPanel
                             openLink={mainStore.openLink}
                             userDisplayName={sessionStore.displayName}
-                            confgurationName={`${mainStore.adxSolution.name}: ${mainStore.adxSolution.resourceSuffixName.toUpperCase()}`}
-                            resourceSuffix={mainStore.adxSolution.resourceSuffixName}
+                            confgurationName={`${mainStore.sbSolution.name}: ${mainStore.sbSolution.resourceSuffixName.toUpperCase()}`}
+                            resourceSuffix={mainStore.sbSolution.resourceSuffixName}
                             mapItemTypeToImageName={mainStore.mapItemTypeToImageName}
-                            configItems={mainStore.adxSolution.configItems}
+                            configItems={mainStore.sbSolution.configItems}
                             deployingItemId={mainStore.deployingItemId}
-                            progressTotal={mainStore.provisionProgress.total}
-                            progressValue={mainStore.provisionProgress.value}
-                            progressLabel={mainStore.provisionProgress.label}
+                            progressLabel={mainStore.provisionProgressLabel}
                         />
                     </Grid.Column>
                 </Grid.Row>
@@ -57,4 +55,4 @@ const ADXConfigurationPage: FC = observer(() => {
     );
 });
 
-export default ADXConfigurationPage;
+export default SbConfigurationPage;

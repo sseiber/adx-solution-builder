@@ -11,8 +11,8 @@ contextBridge.exposeInMainWorld('ipcApi', {
     // Main
     [contextBridgeTypes.Ipc_Log]: (tags, message) => ipcRenderer.invoke(contextBridgeTypes.Ipc_Log, tags, message),
     [contextBridgeTypes.Ipc_OpenSolution]: (loadLastConfiguration) => ipcRenderer.invoke(contextBridgeTypes.Ipc_OpenSolution, loadLastConfiguration),
-    [contextBridgeTypes.Ipc_SaveSolution]: (adxSolution) => ipcRenderer.invoke(contextBridgeTypes.Ipc_SaveSolution, adxSolution),
-    [contextBridgeTypes.Ipc_StartProvisioning]: (adxSolution) => ipcRenderer.invoke(contextBridgeTypes.Ipc_StartProvisioning, adxSolution),
+    [contextBridgeTypes.Ipc_SaveSolution]: (sbSolution) => ipcRenderer.invoke(contextBridgeTypes.Ipc_SaveSolution, sbSolution),
+    [contextBridgeTypes.Ipc_StartProvisioning]: (sbSolution) => ipcRenderer.invoke(contextBridgeTypes.Ipc_StartProvisioning, sbSolution),
     [contextBridgeTypes.Ipc_ProvisioningState]: () => ipcRenderer.invoke(contextBridgeTypes.Ipc_ProvisioningState),
     [contextBridgeTypes.Ipc_ProvisionProgress]: (channel, receiver) => {
         ipcRenderer.on(channel, (event, message) => receiver(event, message));
@@ -26,8 +26,6 @@ contextBridge.exposeInMainWorld('ipcApi', {
     [contextBridgeTypes.Ipc_EndProvisioning]: (channel, receiver) => {
         ipcRenderer.on(channel, (event) => receiver(event));
     },
-    [contextBridgeTypes.Ipc_GetAdapterConfiguration]: (appId, deviceId) => ipcRenderer.invoke(contextBridgeTypes.Ipc_GetAdapterConfiguration, appId, deviceId),
-    [contextBridgeTypes.Ipc_SetAdapterConfiguration]: (adapterConfig) => ipcRenderer.invoke(contextBridgeTypes.Ipc_SetAdapterConfiguration, adapterConfig),
     [contextBridgeTypes.Ipc_OpenLink]: (url) => ipcRenderer.invoke(contextBridgeTypes.Ipc_OpenLink, url),
     [contextBridgeTypes.Ipc_ServiceError]: (channel, receiver) => {
         ipcRenderer.on(channel, (event, error) => receiver(event, error));
@@ -49,15 +47,7 @@ contextBridge.exposeInMainWorld('ipcApi', {
     [contextBridgeTypes.Ipc_GetIotcDevices]: (appSubdomain, appId) => ipcRenderer.invoke(contextBridgeTypes.Ipc_GetIotcDevices, appSubdomain, appId),
     [contextBridgeTypes.Ipc_GetIotcDeviceModules]: (appSubdomain, deviceId) => ipcRenderer.invoke(contextBridgeTypes.Ipc_GetIotcDeviceModules, appSubdomain, deviceId),
 
-    // Industrial Connect
-    [contextBridgeTypes.Ipc_TestConnection]: (apiContext, opcEndpoint) => ipcRenderer.invoke(contextBridgeTypes.Ipc_TestConnection, apiContext, opcEndpoint),
-    [contextBridgeTypes.Ipc_TestConnectionProgress]: (channel, receiver) => {
-        ipcRenderer.on(channel, (event, message) => receiver(event, message));
-    },
-    [contextBridgeTypes.Ipc_FetchNodes]: (apiContext, browseNodesRequest) => ipcRenderer.invoke(contextBridgeTypes.Ipc_FetchNodes, apiContext, browseNodesRequest),
-    [contextBridgeTypes.Ipc_FetchNodesProgress]: (channel, receiver) => {
-        ipcRenderer.on(channel, (event, message) => receiver(event, message));
-    },
+    // Misc.
     [contextBridgeTypes.Ipc_ReceiveMessage]: (channel, receiver) => {
         ipcRenderer.on(channel, (event, ...args) => receiver(event, ...args));
     }

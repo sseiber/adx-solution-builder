@@ -9,7 +9,7 @@ import { AuthenticationState } from './stores/session';
 import AuthenticatedRoute from './components/AuthenticatedRoute';
 import HomePage from './pages/HomePage';
 import AzureConfigPage from './pages/AzureConfigPage';
-import ADXConfigurationPage from './pages/ADXConfiguration/ADXConfigurationPage';
+import SbConfigurationPage from './pages/SbConfiguration/SbConfigurationPage';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import ServiceErrorModal from './components/ServiceErrorModal';
 import { log } from './utils';
@@ -20,7 +20,7 @@ const ModuleName = 'App';
 export enum AppNavigationPaths {
     Root = '/',
     AzureConfig = '/azureconfig',
-    ADXConfig = '/iotcentral'
+    SbConfig = '/iotcentral'
 }
 
 const App: FC = observer((props: any) => {
@@ -43,7 +43,7 @@ const App: FC = observer((props: any) => {
         if (sessionStore.authenticationState === AuthenticationState.Authenticated) {
             log([ModuleName, 'info'], `Would redirect to: ${params.redirectpath || location.pathname}`);
 
-            navigate(AppNavigationPaths.ADXConfig);
+            navigate(AppNavigationPaths.SbConfig);
         }
         else {
             sessionStore.redirectPath = location.pathname;
@@ -62,7 +62,7 @@ const App: FC = observer((props: any) => {
             navigate(AppNavigationPaths.AzureConfig);
         }
         else {
-            void sessionStore.signin(AppNavigationPaths.ADXConfig);
+            void sessionStore.signin(AppNavigationPaths.SbConfig);
         }
     };
 
@@ -110,7 +110,7 @@ const App: FC = observer((props: any) => {
     };
 
     // const logoMenuTitle = sessionStore.authenticationState === AuthenticationState.Authenticated ? `Home` : `Azure IoT Central`;
-    // const logoMenuLink = sessionStore.authenticationState === AuthenticationState.Authenticated ? AppNavigationPaths.ADXConfig : AppNavigationPaths.Root;
+    // const logoMenuLink = sessionStore.authenticationState === AuthenticationState.Authenticated ? AppNavigationPaths.SbConfig : AppNavigationPaths.Root;
     const userNavItem = sessionStore.authenticationState === AuthenticationState.Authenticated
         ? (
             <Dropdown item trigger={(
@@ -204,10 +204,10 @@ const App: FC = observer((props: any) => {
                         <Routes>
                             <Route path={AppNavigationPaths.Root} element={<HomePage />} />
                             <Route path={AppNavigationPaths.AzureConfig} element={<AzureConfigPage />} />
-                            <Route path={AppNavigationPaths.ADXConfig}
+                            <Route path={AppNavigationPaths.SbConfig}
                                 element={
                                     <AuthenticatedRoute redirectTo={AppNavigationPaths.Root}>
-                                        <ADXConfigurationPage />
+                                        <SbConfigurationPage />
                                     </AuthenticatedRoute>
                                 }
                             />
